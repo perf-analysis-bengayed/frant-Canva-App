@@ -1,31 +1,50 @@
-/* media-viewer.component.css */
 .content-panel {
-    position: fixed;
-    top: 0;
-    left: 250px;
-    width: 0;
-    height: 100vh;
-    background-color: white;
-    transition: width 0.3s;
-    overflow: hidden;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-  }
-  
-  .content-panel.open {
-    width: 400px;
-  }
-  
-  .panel-content {
-    padding: 20px;
-  }
-  
-  .panel-content video,
-  .panel-content img {
-    max-width: 100%;
-    margin-top: 20px;
-  }
-  
-  h3 {
-    color: #333;
-    margin-bottom: 15px;
-  }
+  width: 0;
+  overflow: hidden;
+  transition: width 0.3s ease;
+}
+
+.content-panel.open {
+  width: 100%;
+  padding: 20px;
+  background-color: #fff;
+  border-left: 1px solid #ddd;
+}
+
+.panel-content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+h3 {
+  font-size: 20px;
+  margin-bottom: 20px;
+}
+
+.media-sequence {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.media-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 5px;
+  background-color: #fafafa;
+}
+
+.media-item .thumbnail {
+  width: 150px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 5px;
+  margin-right: 20px;
+}
+
+.media-info p {
+  margin: 5px 0;
+  font-size: 14px;
+}

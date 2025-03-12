@@ -1,31 +1,36 @@
-<!-- sidebar.component.html -->
 <div class="sidebar">
-    <h2>Médias</h2>
-    
-    <div class="media-controls">
-      <input 
-        #fileInput
-        type="file" 
-        id="fileInput" 
-        accept="image/*,video/*"
-        (change)="onFileSelected($event)"
-        style="display: none"
-      >
-      <button 
-        (click)="fileInput.click()"
-        class="select-button"
-      >
-        Sélectionner un média
-      </button>
-    </div>
+  <h2>Médias</h2>
   
-    <div class="media-list">
-      <div 
-        class="media-item" 
-        *ngFor="let media of mediaItems"
-        (click)="selectMedia(media)"
-      >
-        <app-media-info [media]="media"></app-media-info>
-      </div>
+  <div class="media-controls">
+    <input 
+      #fileInput
+      type="file" 
+      id="fileInput" 
+      accept="image/*,video/*"
+      (change)="onFileSelected($event)"
+      style="display: none"
+    >
+    <button 
+      (click)="fileInput.click()"
+      class="select-button"
+    >
+      Sélectionner un média
+    </button>
+  </div>
+
+  <div class="media-list" cdkDropList (cdkDropListDropped)="onDrop($event)">
+    <div 
+      class="media-item" 
+      *ngFor="let media of mediaItems"
+      cdkDrag
+      (click)="selectMedia(media)"
+    >
+      <app-media-info 
+        [media]="media"
+        (dragStart)="selectMedia(media)"
+        (durationChange)="onDurationChange()"
+        (timeChange)="onTimeChange()"
+      ></app-media-info>
     </div>
   </div>
+</div>

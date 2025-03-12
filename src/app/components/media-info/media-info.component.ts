@@ -1,10 +1,11 @@
-// media-info.component.ts
 import { Component, Input, Output, EventEmitter, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 
 interface Media {
   name: string;
   type: string;
-  duration?: string;
+  duration?: number;
+  startTime?: number;
+  endTime?: number;
   thumbnail?: string;
 }
 
@@ -16,6 +17,8 @@ interface Media {
 export class MediaInfoComponent implements AfterViewInit {
   @Input() media!: Media;
   @Output() dragStart = new EventEmitter<Media>();
+  @Output() durationChange = new EventEmitter<void>();
+  @Output() timeChange = new EventEmitter<void>(); // Ajout pour gérer les changements de temps
   @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
 
   ngAfterViewInit() {
@@ -29,9 +32,20 @@ export class MediaInfoComponent implements AfterViewInit {
     this.dragStart.emit(this.media);
   }
 
+  onDurationChange() {
+    if (this.media.type.startsWith('image') && this.media.duration && this.media.startTime !== undefined) {
+      this.media.endTime = this.media.startTime + this.media.duration;
+    }
+    this.durationChange.emit();
+  }
+
+  onTimeChange() {
+    this.timeChange.emit(); // Émet un événement pour recalculer les temps si nécessaire
+  }
+
   private generateVideoThumbnail() {
     const video = this.videoElement.nativeElement;
-    video.currentTime = 1; // Aller à la 1ère seconde
+    video.currentTime = 1;
 
     video.onloadeddata = () => {
       const canvas = document.createElement('canvas');

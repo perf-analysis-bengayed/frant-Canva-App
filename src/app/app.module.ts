@@ -9,6 +9,7 @@ import { HomeComponent } from './home/home.component';
 import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { MediaInfoComponent } from './components/media-info/media-info.component';
 import { MediaViewerComponent } from './components/media-viewer/media-viewer.component';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 
 
 
@@ -21,14 +22,15 @@ import { MediaViewerComponent } from './components/media-viewer/media-viewer.com
     SidebarComponent,
     MediaInfoComponent,
     MediaViewerComponent,
-
     
   ],
   imports: [
     BrowserModule,
     AppRoutingModule,
     FormsModule,
-    HttpClientModule
+    HttpClientModule,
+    DragDropModule
+
   ],
   providers: [],
   bootstrap: [AppComponent]

@@ -1,18 +1,18 @@
-<!-- home.component.html -->
 <div class="home-container">
-    <app-sidebar (mediaSelected)="onMediaSelected($event)"></app-sidebar>
-    
-    <main 
-      [class]="getMainContentClass()"
-      (drop)="onDrop($event)"
-      (dragover)="onDragOver($event)"
-    >
-      <div class="content-wrapper">
-        <!-- <h1>Bienvenue dans le Media Viewer</h1> -->
-        
-        <app-media-viewer 
-          [selectedMedia]="selectedMedia"
-        ></app-media-viewer>
-      </div>
-    </main>
-  </div>
+  <app-sidebar 
+    (mediaSelected)="onMediaSelected($event)"
+    (mediaItemsChange)="onMediaItemsChange($event)"
+  ></app-sidebar>
+  
+  <main 
+    [class]="getMainContentClass()"
+    (drop)="onDrop($event)"
+    (dragover)="onDragOver($event)"
+  >
+    <div class="content-wrapper">
+      <app-media-viewer 
+        [mediaItems]="mediaItems"
+      ></app-media-viewer>
+    </div>
+  </main>
+</div>

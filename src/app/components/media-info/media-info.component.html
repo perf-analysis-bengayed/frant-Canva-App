@@ -1,11 +1,9 @@
-<!-- media-info.component.html -->
 <div 
   class="media-info" 
   draggable="true"
   (dragstart)="onDragStart($event)"
 >
   <div class="media-preview">
-    <!-- Thumbnail preview -->
     <img 
       *ngIf="media.type.startsWith('image')" 
       [src]="media.thumbnail || 'assets/default-image.jpg'" 
@@ -28,6 +26,17 @@
   <div class="media-details">
     <p class="name">{{ media.name }}</p>
     <p class="type">{{ media.type }}</p>
-    <p class="duration" *ngIf="media.duration">Durée: {{ media.duration }}</p>
+    <div *ngIf="media.type.startsWith('image')">
+      <label>Durée (s): </label>
+      <input type="number" [(ngModel)]="media.duration" (change)="onDurationChange()" min="0">
+    </div>
+    <div>
+      <label>Début (s): </label>
+      <input type="number" [(ngModel)]="media.startTime" (change)="onTimeChange()" min="0">
+    </div>
+    <div>
+      <label>Fin (s): </label>
+      <input type="number" [(ngModel)]="media.endTime" (change)="onTimeChange()" min="0">
+    </div>
   </div>
 </div>

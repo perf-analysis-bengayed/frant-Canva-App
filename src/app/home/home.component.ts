@@ -1,10 +1,12 @@
-// home.component.ts
-import { Component } from '@angular/core';
+import { Component, Input } from '@angular/core';
 
 interface Media {
   name: string;
   type: string;
-  duration?: string;
+  duration?: number;
+  startTime?: number;
+  endTime?: number;
+  thumbnail?: string;
 }
 
 @Component({
@@ -13,10 +15,15 @@ interface Media {
   styleUrls: ['./home.component.css']
 })
 export class HomeComponent {
+ 
   selectedMedia: Media | null = null;
-
+  @Input() mediaItems: Media[] = [];
   onMediaSelected(media: Media) {
     this.selectedMedia = media;
+  }
+
+  onMediaItemsChange(mediaItems: Media[]) {
+    this.mediaItems = mediaItems;
   }
 
   onDrop(event: DragEvent) {
@@ -33,6 +40,6 @@ export class HomeComponent {
   }
 
   getMainContentClass() {
-    return this.selectedMedia ? 'main-content with-viewer' : 'main-content';
+    return this.mediaItems.length > 0 ? 'main-content with-viewer' : 'main-content';
   }
 }

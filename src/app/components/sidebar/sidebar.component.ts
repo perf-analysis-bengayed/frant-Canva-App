@@ -1,10 +1,12 @@
-// sidebar.component.ts
 import { Component, Output, EventEmitter } from '@angular/core';
+import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 
 interface Media {
   name: string;
   type: string;
-  duration?: string;
+  duration?: number;
+  startTime?: number;
+  endTime?: number;
   thumbnail?: string;
 }
 
@@ -15,10 +17,9 @@ interface Media {
 })
 export class SidebarComponent {
   @Output() mediaSelected = new EventEmitter<Media>();
+  @Output() mediaItemsChange = new EventEmitter<Media[]>(); // Ajout pour partager la liste
 
-  mediaItems: Media[] = [
-  ];
-
+  mediaItems: Media[] = [];
   selectedMedia: Media | null = null;
 
   selectMedia(media: Media) {
@@ -33,7 +34,7 @@ export class SidebarComponent {
       const newMedia: Media = {
         name: file.name,
         type: file.type,
-        thumbnail: URL.createObjectURL(file) // URL temporaire pour les images
+        thumbnail: URL.createObjectURL(file)
       };
 
       if (file.type.startsWith('video')) {
@@ -42,9 +43,8 @@ export class SidebarComponent {
         video.src = URL.createObjectURL(file);
 
         video.onloadedmetadata = () => {
-          newMedia.duration = this.formatDuration(video.duration);
-          // Générer le thumbnail
-          video.currentTime = 1; // 1ère seconde
+          newMedia.duration = video.duration;
+          video.currentTime = 1;
           video.onseeked = () => {
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
@@ -54,19 +54,45 @@ export class SidebarComponent {
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               newMedia.thumbnail = canvas.toDataURL('image/jpeg');
             }
-            this.mediaItems.push(newMedia);
+            this.addMedia(newMedia);
             URL.revokeObjectURL(video.src);
           };
         };
-      } else {
-        this.mediaItems.push(newMedia);
+      } else if (file.type.startsWith('image')) {
+        newMedia.duration = 5; // Durée par défaut pour les images
+        this.addMedia(newMedia);
       }
     }
   }
 
-  private formatDuration(seconds: number): string {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+  addMedia(media: Media) {
+    this.mediaItems.push(media);
+    this.updateMediaTimes();
+    this.mediaItemsChange.emit(this.mediaItems);
+  }
+
+  updateMediaTimes() {
+    let currentTime = 0;
+    for (const media of this.mediaItems) {
+      media.startTime = currentTime;
+      media.endTime = currentTime + (media.duration || (media.type.startsWith('image') ? 5 : 0));
+      currentTime = media.endTime;
+    }
+  }
+
+  onDrop(event: CdkDragDrop<Media[]>) {
+    moveItemInArray(this.mediaItems, event.previousIndex, event.currentIndex);
+    this.updateMediaTimes(); // Your custom method
+    this.mediaItemsChange.emit(this.mediaItems); // Assuming this is an Output
+  }
+
+  onDurationChange() {
+    this.updateMediaTimes();
+    this.mediaItemsChange.emit(this.mediaItems);
+  }
+
+  onTimeChange() {
+    this.updateMediaTimes();
+    this.mediaItemsChange.emit(this.mediaItems);
   }
 }

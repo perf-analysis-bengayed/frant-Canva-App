@@ -1,23 +1,19 @@
-/* home.component.css */
-.app-container {
-    display: flex;
-    position: relative;
-  }
-  
-  .main-content {
-    margin-left: 250px; /* Largeur de la sidebar */
-    width: calc(100% - 250px); /* Ajuste la largeur en fonction de la sidebar */
-    padding: 20px;
-  }
-  
-  .main-content.with-viewer {
-    width: calc(100% - 650px); /* 250px sidebar + 400px media-viewer */
-  }
-  
-  h1 {
-    color: #333;
-  }
-  
-  p {
-    color: #666;
-  }
+.home-container {
+  display: flex;
+  height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  background-color: #fff;
+  overflow-y: auto;
+}
+
+.main-content.with-viewer {
+  display: flex;
+}
+
+.content-wrapper {
+  flex: 1;
+  padding: 20px;
+}
