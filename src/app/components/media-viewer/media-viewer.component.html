@@ -1,0 +1,13 @@
+<!-- media-viewer.component.html -->
+<div class="content-panel" [class.open]="selectedMedia">
+    <div class="panel-content" *ngIf="selectedMedia">
+      <h3>{{ selectedMedia.name }}</h3>
+      <app-media-info [media]="selectedMedia"></app-media-info>
+      <video *ngIf="selectedMedia.type.startsWith('video')" controls>
+        <source src="assets/{{selectedMedia.name}}.mp4" [type]="selectedMedia.type">
+      </video>
+      <img *ngIf="selectedMedia.type.startsWith('image')" 
+           src="assets/{{selectedMedia.name}}.jpg" 
+           alt="{{selectedMedia.name}}">
+    </div>
+  </div>

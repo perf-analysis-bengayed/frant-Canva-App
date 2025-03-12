@@ -1,0 +1,33 @@
+<!-- media-info.component.html -->
+<div 
+  class="media-info" 
+  draggable="true"
+  (dragstart)="onDragStart($event)"
+>
+  <div class="media-preview">
+    <!-- Thumbnail preview -->
+    <img 
+      *ngIf="media.type.startsWith('image')" 
+      [src]="media.thumbnail || 'assets/default-image.jpg'" 
+      alt="thumbnail"
+      class="thumbnail"
+    >
+    <video 
+      #videoElement
+      *ngIf="media.type.startsWith('video')" 
+      class="thumbnail"
+      [src]="media.thumbnail ? null : 'assets/' + media.name" 
+      [poster]="media.thumbnail"
+      preload="metadata"
+      muted
+    >
+      <source [src]="'assets/' + media.name" [type]="media.type">
+    </video>
+  </div>
+  
+  <div class="media-details">
+    <p class="name">{{ media.name }}</p>
+    <p class="type">{{ media.type }}</p>
+    <p class="duration" *ngIf="media.duration">Durée: {{ media.duration }}</p>
+  </div>
+</div>

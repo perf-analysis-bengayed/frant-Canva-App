@@ -1,0 +1,31 @@
+/* media-viewer.component.css */
+.content-panel {
+    position: fixed;
+    top: 0;
+    left: 250px;
+    width: 0;
+    height: 100vh;
+    background-color: white;
+    transition: width 0.3s;
+    overflow: hidden;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  }
+  
+  .content-panel.open {
+    width: 400px;
+  }
+  
+  .panel-content {
+    padding: 20px;
+  }
+  
+  .panel-content video,
+  .panel-content img {
+    max-width: 100%;
+    margin-top: 20px;
+  }
+  
+  h3 {
+    color: #333;
+    margin-bottom: 15px;
+  }
