@@ -109,8 +109,11 @@ export class MediaInfoComponent implements AfterViewInit {
   }
 
   getFileExtension(type: string): string {
-    // Extraire l'extension à partir du type MIME
-    const extension = type.split('/')[1];
-    return extension ? `.${extension}` : '';
+    if (type.startsWith('image')) {
+      return 'image';
+    } else if (type.startsWith('video')) {
+      return 'vidéo';
+    }
+    return 'inconnu';
   }
 }
