@@ -18,7 +18,11 @@
     </button>
   </div>
 
-  <div class="media-list" cdkDropList (cdkDropListDropped)="onDrop($event)">
+  <div 
+    class="media-list" 
+    cdkDropList
+    (cdkDropListDropped)="onDrop($event)"
+  >
     <div 
       class="media-item" 
       *ngFor="let media of mediaItems"

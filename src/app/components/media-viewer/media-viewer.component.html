@@ -1,26 +1,51 @@
 <div class="content-panel" [class.open]="mediaItems.length > 0">
   <div class="panel-content">
     <h3>Timeline des Médias</h3>
-    <div class="media-sequence">
-      <div *ngFor="let media of mediaItems" class="media-item">
+    <div class="media-player">
+      <!-- Lecteur vidéo pour les vidéos -->
+      <video 
+        #videoPlayer 
+        class="video-player" 
+        controls 
+        *ngIf="mediaItems.length > 0 && currentMediaIndex < mediaItems.length && mediaItems[currentMediaIndex] && mediaItems[currentMediaIndex].type.startsWith('video')"
+      >
+        <source [src]="'assets/' + mediaItems[currentMediaIndex].name" [type]="mediaItems[currentMediaIndex].type">
+      </video>
+
+      <!-- Affichage d'image temporaire -->
+      <img 
+        *ngIf="mediaItems.length > 0 && currentMediaIndex < mediaItems.length && mediaItems[currentMediaIndex] && mediaItems[currentMediaIndex].type.startsWith('image')"
+        [src]="mediaItems[currentMediaIndex].thumbnail || 'assets/default-image.jpg'" 
+        alt="Current Image"
+        class="image-player"
+      >
+    </div>
+
+    <!-- Timeline visuelle -->
+    <div class="timeline">
+      <div 
+        *ngFor="let media of mediaItems; let i = index" 
+        class="timeline-item"
+        [class.active]="i === currentMediaIndex"
+      >
         <img 
-          *ngIf="media.type.startsWith('image')" 
+          *ngIf="media.type.startsWith('image')"
           [src]="media.thumbnail || 'assets/default-image.jpg'" 
           alt="thumbnail"
-          class="thumbnail"
+          class="timeline-thumbnail"
         >
         <video 
-          *ngIf="media.type.startsWith('video')" 
-          class="thumbnail"
+          *ngIf="media.type.startsWith('video')"
           [poster]="media.thumbnail"
-          preload="metadata"
+          class="timeline-thumbnail"
           muted
+          preload="metadata"
         >
           <source [src]="'assets/' + media.name" [type]="media.type">
         </video>
-        <div class="media-info">
+        <div class="timeline-info">
           <p>{{ media.name }}</p>
-          <p>Début: {{ media.startTime ?? 0 }}s - Fin: {{ media.endTime ?? 0 }}s</p>
+          <p>{{ media.startTime }}s - {{ media.endTime }}s</p>
         </div>
       </div>
     </div>

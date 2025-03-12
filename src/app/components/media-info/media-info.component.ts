@@ -18,7 +18,7 @@ export class MediaInfoComponent implements AfterViewInit {
   @Input() media!: Media;
   @Output() dragStart = new EventEmitter<Media>();
   @Output() durationChange = new EventEmitter<void>();
-  @Output() timeChange = new EventEmitter<void>(); // Ajout pour gérer les changements de temps
+  @Output() timeChange = new EventEmitter<void>();
   @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
 
   ngAfterViewInit() {
@@ -33,14 +33,21 @@ export class MediaInfoComponent implements AfterViewInit {
   }
 
   onDurationChange() {
-    if (this.media.type.startsWith('image') && this.media.duration && this.media.startTime !== undefined) {
-      this.media.endTime = this.media.startTime + this.media.duration;
+    if (this.media.type.startsWith('image')) {
+      // Assurer une durée minimale de 5 secondes pour les images
+      if (this.media.duration && this.media.duration < 5) {
+        this.media.duration = 5;
+      }
+      if (this.media.startTime !== undefined) {
+        this.media.endTime = this.media.startTime + (this.media.duration || 5);
+      }
+      this.durationChange.emit();
     }
-    this.durationChange.emit();
+    // Pas d'action pour les vidéos car la durée est fixe
   }
 
   onTimeChange() {
-    this.timeChange.emit(); // Émet un événement pour recalculer les temps si nécessaire
+    this.timeChange.emit();
   }
 
   private generateVideoThumbnail() {

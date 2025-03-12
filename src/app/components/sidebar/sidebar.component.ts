@@ -17,7 +17,7 @@ interface Media {
 })
 export class SidebarComponent {
   @Output() mediaSelected = new EventEmitter<Media>();
-  @Output() mediaItemsChange = new EventEmitter<Media[]>(); // Ajout pour partager la liste
+  @Output() mediaItemsChange = new EventEmitter<Media[]>();
 
   mediaItems: Media[] = [];
   selectedMedia: Media | null = null;
@@ -43,7 +43,7 @@ export class SidebarComponent {
         video.src = URL.createObjectURL(file);
 
         video.onloadedmetadata = () => {
-          newMedia.duration = video.duration;
+          newMedia.duration = video.duration; // Durée fixe basée sur la vidéo
           video.currentTime = 1;
           video.onseeked = () => {
             const canvas = document.createElement('canvas');
@@ -59,7 +59,7 @@ export class SidebarComponent {
           };
         };
       } else if (file.type.startsWith('image')) {
-        newMedia.duration = 5; // Durée par défaut pour les images
+        newMedia.duration = 5; // Durée par défaut de 5 secondes pour les images
         this.addMedia(newMedia);
       }
     }
@@ -75,15 +75,15 @@ export class SidebarComponent {
     let currentTime = 0;
     for (const media of this.mediaItems) {
       media.startTime = currentTime;
-      media.endTime = currentTime + (media.duration || (media.type.startsWith('image') ? 5 : 0));
+      media.endTime = currentTime + (media.duration || 0);
       currentTime = media.endTime;
     }
   }
 
   onDrop(event: CdkDragDrop<Media[]>) {
     moveItemInArray(this.mediaItems, event.previousIndex, event.currentIndex);
-    this.updateMediaTimes(); // Your custom method
-    this.mediaItemsChange.emit(this.mediaItems); // Assuming this is an Output
+    this.updateMediaTimes();
+    this.mediaItemsChange.emit(this.mediaItems);
   }
 
   onDurationChange() {
