@@ -15,9 +15,9 @@ interface Media {
   styleUrls: ['./home.component.css']
 })
 export class HomeComponent {
- 
   selectedMedia: Media | null = null;
   @Input() mediaItems: Media[] = [];
+
   onMediaSelected(media: Media) {
     this.selectedMedia = media;
   }

@@ -7,6 +7,7 @@ interface Media {
   startTime?: number;
   endTime?: number;
   thumbnail?: string;
+  originalDuration?: number;
 }
 
 @Component({
@@ -19,11 +20,17 @@ export class MediaInfoComponent implements AfterViewInit {
   @Output() dragStart = new EventEmitter<Media>();
   @Output() durationChange = new EventEmitter<void>();
   @Output() timeChange = new EventEmitter<void>();
+  @Output() trimVideo = new EventEmitter<{startTime: number, duration: number}>();
   @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
 
+  maxVideoDuration = 60;
+
   ngAfterViewInit() {
-    if (this.media.type.startsWith('video') && !this.media.thumbnail) {
-      this.generateVideoThumbnail();
+    if (this.media.type.startsWith('video')) {
+      this.checkVideoDuration();
+      if (!this.media.thumbnail) {
+        this.generateVideoThumbnail();
+      }
     }
   }
 
@@ -33,21 +40,52 @@ export class MediaInfoComponent implements AfterViewInit {
   }
 
   onDurationChange() {
-    if (this.media.type.startsWith('image')) {
-      // Assurer une durée minimale de 5 secondes pour les images
-      if (this.media.duration && this.media.duration < 5) {
-        this.media.duration = 5;
+    if (this.media.type.startsWith('video')) {
+      const maxDuration = this.media.originalDuration || this.maxVideoDuration;
+      if (this.media.duration !== undefined) {
+        this.media.duration = Math.min(Math.max(1, this.media.duration), maxDuration);
       }
-      if (this.media.startTime !== undefined) {
-        this.media.endTime = this.media.startTime + (this.media.duration || 5);
+    } else if (this.media.type.startsWith('image')) {
+      if (this.media.duration !== undefined) {
+        this.media.duration = Math.max(5, this.media.duration);
+       
+
       }
-      this.durationChange.emit();
     }
-    // Pas d'action pour les vidéos car la durée est fixe
+    this.updateEndTime();
+    this.durationChange.emit();
   }
 
   onTimeChange() {
     this.timeChange.emit();
+  }
+
+  checkVideoDuration() {
+    if (this.media.duration && this.media.duration > this.maxVideoDuration) {
+      this.media.duration = this.maxVideoDuration;
+      this.media.endTime = (this.media.startTime || 0) + this.maxVideoDuration;
+      this.trimVideo.emit({
+        startTime: this.media.startTime || 0,
+        duration: this.maxVideoDuration
+      });
+    }
+  }
+
+  trimVideoManually(startTime: number, duration: number) {
+    if (duration > this.maxVideoDuration) {
+      duration = this.maxVideoDuration;
+    }
+    this.media.startTime = startTime;
+    this.media.duration = duration;
+    this.media.endTime = startTime + duration;
+    this.trimVideo.emit({ startTime, duration });
+    this.durationChange.emit();
+  }
+
+  private updateEndTime() {
+    if (this.media.startTime !== undefined && this.media.duration !== undefined) {
+      this.media.endTime = this.media.startTime + this.media.duration;
+    }
   }
 
   private generateVideoThumbnail() {
@@ -64,5 +102,15 @@ export class MediaInfoComponent implements AfterViewInit {
         this.media.thumbnail = canvas.toDataURL('image/jpeg');
       }
     };
+  }
+  getFileNameWithoutExtension(fileName: string): string {
+    const lastDotIndex = fileName.lastIndexOf('.');
+    return lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
+  }
+
+  getFileExtension(type: string): string {
+    // Extraire l'extension à partir du type MIME
+    const extension = type.split('/')[1];
+    return extension ? `.${extension}` : '';
   }
 }

@@ -67,4 +67,5 @@ h3 {
 .timeline-info p {
   margin: 2px 0;
   font-size: 12px;
+  justify-self: end;
 }

@@ -24,9 +24,9 @@
   </div>
   
   <div class="media-details">
-    <p class="name">{{ media.name }}</p>
-    
-    <!-- Afficher la durée uniquement pour les images avec un champ modifiable -->
+    <p class="name">{{ getFileNameWithoutExtension(media.name) }}</p>
+    <p class="type">{{ getFileExtension(media.type) }}</p>
+
     <div *ngIf="media.type.startsWith('image')">
       <label>Durée: </label>
       <input 
@@ -36,17 +36,20 @@
         min="5"
       >
     </div>
-    <!-- Afficher la durée fixe pour les vidéos -->
-    <p *ngIf="media.type.startsWith('video') && media.duration">
-      Durée: {{ media.duration }}s
-    </p>
-    <div>
-      <label>Début: </label>
-      <input type="number" [(ngModel)]="media.startTime" (change)="onTimeChange()" min="0">
+    
+    <div *ngIf="media.type.startsWith('video')">
+      <label>Durée: </label>
+      <input 
+        type="number" 
+        [(ngModel)]="media.duration" 
+        (change)="onDurationChange()" 
+        min="1"
+        [max]="media.originalDuration || maxVideoDuration"
+      >
     </div>
-    <div>
-      <label>Fin:</label>
-      <input type="number" [(ngModel)]="media.endTime" (change)="onTimeChange()" min="0">
+
+    <div class="timeline-info">
+      <p>{{ media.startTime }}s - {{ media.endTime }}s</p>
     </div>
   </div>
 </div>
