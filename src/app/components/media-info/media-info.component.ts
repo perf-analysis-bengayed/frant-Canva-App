@@ -116,4 +116,6 @@ export class MediaInfoComponent implements AfterViewInit {
     }
     return 'inconnu';
   }
+  
+
 }

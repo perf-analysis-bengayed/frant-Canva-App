@@ -1,26 +1,8 @@
 <div class="content-panel" [class.open]="mediaItems.length > 0">
   <div class="panel-content">
-    <h3>Timeline des Médias</h3>
-    <div class="media-player">
-      <!-- Lecteur vidéo pour les vidéos -->
-      <video 
-        #videoPlayer 
-        class="video-player" 
-        controls 
-        *ngIf="mediaItems.length > 0 && currentMediaIndex < mediaItems.length && mediaItems[currentMediaIndex] && mediaItems[currentMediaIndex].type.startsWith('video')"
-      >
-        <source [src]="'assets/' + mediaItems[currentMediaIndex].name" [type]="mediaItems[currentMediaIndex].type">
-      </video>
-
-      <!-- Affichage d'image temporaire -->
-      <img 
-        *ngIf="mediaItems.length > 0 && currentMediaIndex < mediaItems.length && mediaItems[currentMediaIndex] && mediaItems[currentMediaIndex].type.startsWith('image')"
-        [src]="mediaItems[currentMediaIndex].thumbnail || 'assets/default-image.jpg'" 
-        alt="Current Image"
-        class="image-player"
-      >
-    </div>
-
+    <h3>Canva</h3>
+    <canvas #canvasElement></canvas>
+    <video #videoElement style="display: none;"></video>
     <!-- Timeline visuelle -->
     <div class="timeline">
       <div 
@@ -41,11 +23,11 @@
           muted
           preload="metadata"
         >
-          <source [src]="'assets/' + media.name" [type]="media.type">
+          <source [src]="media.thumbnail || ('assets/' + media.name)" [type]="media.type">
         </video>
         <div class="timeline-info">
           <p>{{ media.name }}</p>
-          <p>{{ media.startTime }}s - {{ media.endTime }}s</p>
+          <p>{{ media.startTime || 0 }}s - {{ media.endTime || media.duration || 0 }}s</p>
         </div>
       </div>
     </div>

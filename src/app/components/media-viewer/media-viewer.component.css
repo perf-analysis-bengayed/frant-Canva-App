@@ -1,71 +1,85 @@
 .content-panel {
-  width: 0;
-  overflow: hidden;
-  transition: width 0.3s ease;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-.content-panel.open {
-  width: 100%;
-  padding: 20px;
-  background-color: #fff;
-  border-left: 1px solid #ddd;
+.content-panel:not(.open) {
+  display: none;
 }
 
 .panel-content {
-  max-width: 800px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 h3 {
-  font-size: 20px;
-  margin-bottom: 20px;
+  font-size: 24px;
+  margin: 0;
+  color: #333;
+  text-align: center;
 }
 
-.media-player {
-  position: relative;
+canvas {
   width: 100%;
-  max-height: 400px;
-  margin-bottom: 20px;
-}
-
-.video-player, .image-player {
-  width: 100%;
-  max-height: 400px;
-  object-fit: contain;
-  border-radius: 5px;
+  height: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #cccaca;
+  cursor: pointer;
 }
 
 .timeline {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid #ddd;
 }
 
 .timeline-item {
+  flex: 0 0 auto;
+  width: 120px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   padding: 5px;
-  border: 1px solid #eee;
-  border-radius: 5px;
-  background-color: #fafafa;
-  transition: background-color 0.3s;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  transition: border-color 0.3s;
 }
 
 .timeline-item.active {
-  background-color: #e0f7fa;
-  border-color: #00acc1;
+  border-color: #4CAF50;
 }
 
 .timeline-thumbnail {
-  width: 50px;
-  height: 50px;
+  width: 100%;
+  height: 80px;
   object-fit: cover;
-  border-radius: 3px;
-  margin-right: 10px;
+  border-radius: 4px;
+}
+
+.timeline-info {
+  text-align: center;
+  margin-top: 5px;
 }
 
 .timeline-info p {
-  margin: 2px 0;
+  margin: 5px 0;
   font-size: 12px;
-  justify-self: end;
+  color: #888;
+  text-align: right;
+}
+
+.timeline-info p:first-child {
+  font-weight: bold;
+  color: #333;
 }
