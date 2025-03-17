@@ -7,6 +7,7 @@ interface Media {
   startTime?: number;
   endTime?: number;
   thumbnail?: string;
+  source?: string;
 }
 
 @Component({
@@ -33,13 +34,14 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private imageStartTime: number = 0;
   private imagePausedElapsed: number = 0;
 
-  // Propriétés pour le texte overlay
   overlayText: string = '';
   inputPosition: string = 'top-right';
   showPositionMenu: boolean = false;
 
   private mouseMoveListener = (event: MouseEvent) => this.handleMouseMove(event);
   private canvasClickListener = (event: MouseEvent) => this.handleCanvasClick(event);
+
+  @Input() selectedMedia?: Media;
 
   ngAfterViewInit() {
     this.setupCanvas();
@@ -50,16 +52,27 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   }
 
   ngOnChanges(changes: SimpleChanges) {
+    if (changes['selectedMedia'] && this.selectedMedia) {
+      const index = this.mediaItems.findIndex(item => item.name === this.selectedMedia!.name);
+      if (index !== -1) {
+        this.currentMediaIndex = index;
+        this.cumulativeTime = this.mediaItems
+          .slice(0, this.currentMediaIndex)
+          .reduce((sum, media) => sum + (media.duration || 0), 0);
+        this.pausedAtTime = null;
+        this.imagePausedElapsed = 0;
+        if (this.animationFrameId) {
+          cancelAnimationFrame(this.animationFrameId);
+        }
+        const video = this.videoElement.nativeElement;
+        video.pause(); // Arrêter toute vidéo en cours
+        video.currentTime = 0; // Réinitialiser
+        this.playCurrentMedia();
+      }
+    }
     if (changes['mediaItems']) {
-      this.currentMediaIndex = 0;
-      this.cumulativeTime = 0;
-      if (this.animationFrameId) {
-        cancelAnimationFrame(this.animationFrameId);
-      }
       this.calculateTotalDuration();
-      if (this.isPlaying) {
-        this.startMediaSequence();
-      }
+      this.playCurrentMedia();
     }
   }
 
@@ -67,6 +80,10 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
     }
+    this.mediaItems.forEach(media => {
+      if (media.thumbnail) URL.revokeObjectURL(media.thumbnail);
+      if (media.source) URL.revokeObjectURL(media.source);
+    });
     const canvas = this.canvasElement.nativeElement;
     canvas.removeEventListener('mousemove', this.mouseMoveListener);
     canvas.removeEventListener('click', this.canvasClickListener);
@@ -126,23 +143,6 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private playSequence() {
     if (!this.isPlaying) {
       this.isPlaying = true;
-      const currentMedia = this.mediaItems[this.currentMediaIndex];
-      if (currentMedia) {
-        const previousMediaDuration = this.mediaItems
-          .slice(0, this.currentMediaIndex)
-          .reduce((sum, media) => sum + (media.duration || 0), 0);
-
-        if (currentMedia.type.startsWith('video')) {
-          const video = this.videoElement.nativeElement;
-          video.currentTime = this.pausedAtTime !== null ? this.pausedAtTime : (currentMedia.startTime || 0);
-          const currentMediaElapsed = video.currentTime - (currentMedia.startTime || 0);
-          this.cumulativeTime = previousMediaDuration + currentMediaElapsed;
-          video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
-        } else if (currentMedia.type.startsWith('image')) {
-          const currentMediaElapsed = this.imagePausedElapsed / 1000;
-          this.cumulativeTime = previousMediaDuration + currentMediaElapsed;
-        }
-      }
       this.startMediaSequence();
     }
   }
@@ -163,6 +163,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
           this.imagePausedElapsed = performance.now() - this.imageStartTime;
         }
       }
+      this.drawControls(); // Update controls to reflect paused state
     }
   }
 
@@ -175,18 +176,24 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
 
     if (currentMedia.type.startsWith('video')) {
       const video = this.videoElement.nativeElement;
-      const targetTime = newTime + (currentMedia.startTime || 0);
+      const targetTime = newTime;
       video.currentTime = targetTime;
       this.pausedAtTime = targetTime;
+      this.cumulativeTime = this.mediaItems
+        .slice(0, this.currentMediaIndex)
+        .reduce((sum, media) => sum + (media.duration || 0), 0) + newTime;
     } else if (currentMedia.type.startsWith('image')) {
       this.imagePausedElapsed = newTime * 1000;
       this.imageStartTime = performance.now() - this.imagePausedElapsed;
+      this.cumulativeTime = this.mediaItems
+        .slice(0, this.currentMediaIndex)
+        .reduce((sum, media) => sum + (media.duration || 0), 0) + newTime;
     }
 
     if (this.isPlaying) {
       this.startMediaSequence();
     } else {
-      this.drawControls();
+      this.playCurrentMedia();
     }
   }
 
@@ -213,42 +220,43 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       this.playCurrentMedia();
     }
   }
-
   private playCurrentMedia() {
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
-
+  
+    // Nettoyer le canvas avant de rendre un nouveau média
     this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-
+  
     if (currentMedia.type.startsWith('video')) {
       const video = this.videoElement.nativeElement;
-      video.src = currentMedia.thumbnail || `assets/${currentMedia.name}`;
-      
-console.log('Tentative de chargement de la vidéo depuis :', video.src); 
+  
+      // Réinitialiser la source pour éviter les problèmes de cache ou d'état précédent
+      video.src = '';
+      video.src = currentMedia.source || currentMedia.thumbnail || `assets/${currentMedia.name}`;
       video.muted = false;
-
+  
       video.onloadeddata = () => {
         if (!currentMedia.duration) {
           currentMedia.duration = video.duration;
           this.calculateTotalDuration();
         }
-        console.log(`Vidéo chargée : ${currentMedia.name}`);
+        // Si pausedAtTime est défini (par exemple via seekTo ou pause), utiliser cette valeur
+        video.currentTime = this.pausedAtTime || 0;
         if (this.isPlaying) {
-          video.currentTime = this.pausedAtTime !== null ? this.pausedAtTime : (currentMedia.startTime || 0);
           video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
         }
         this.renderVideoFrame();
       };
-
+  
       video.onerror = () => {
         console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
         this.nextMedia();
       };
-
+  
       video.ontimeupdate = () => {
-        const relativeTime = video.currentTime - (currentMedia.startTime || 0);
-        this.updateCumulativeTime(relativeTime);
-        if (relativeTime >= (currentMedia.duration || video.duration)) {
+        const elapsed = video.currentTime;
+        this.updateCumulativeTime(elapsed);
+        if (elapsed >= (currentMedia.duration || video.duration)) {
           video.pause();
           this.nextMedia();
         }
@@ -257,27 +265,23 @@ console.log('Tentative de chargement de la vidéo depuis :', video.src);
       const img = new Image();
       img.src = currentMedia.thumbnail || 'assets/default-image.jpg';
       img.onload = () => {
-        this.imageStartTime = performance.now();
-        if (this.imagePausedElapsed > 0) {
-          this.imageStartTime = performance.now() - this.imagePausedElapsed;
-          const previousMediaDuration = this.mediaItems
-            .slice(0, this.currentMediaIndex)
-            .reduce((sum, media) => sum + (media.duration || 0), 0);
-          const currentMediaElapsed = this.imagePausedElapsed / 1000;
-          this.cumulativeTime = previousMediaDuration + currentMediaElapsed;
-        }
+        this.imageStartTime = performance.now() - (this.imagePausedElapsed || 0);
         const duration = (currentMedia.duration || 5) * 1000;
         const drawImageFrame = (currentTime: number) => {
-          if (!this.isPlaying) return;
+          if (!this.isPlaying) {
+            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+            this.drawControls();
+            return;
+          }
           const elapsed = (currentTime - this.imageStartTime) / 1000;
           this.updateCumulativeTime(elapsed);
           if (elapsed >= (currentMedia.duration || 5)) {
             this.nextMedia();
-            return;
+          } else {
+            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+            this.drawControls();
+            this.animationFrameId = requestAnimationFrame(drawImageFrame);
           }
-          this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-          this.drawControls();
-          this.animationFrameId = requestAnimationFrame(drawImageFrame);
         };
         this.animationFrameId = requestAnimationFrame(drawImageFrame);
       };
@@ -287,6 +291,7 @@ console.log('Tentative de chargement de la vidéo depuis :', video.src);
       };
     }
   }
+ 
 
   private renderVideoFrame() {
     const canvas = this.canvasElement.nativeElement;
@@ -295,6 +300,9 @@ console.log('Tentative de chargement de la vidéo depuis :', video.src);
       this.ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       this.drawControls();
       this.animationFrameId = requestAnimationFrame(() => this.renderVideoFrame());
+    } else if (!this.isPlaying) {
+      this.ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      this.drawControls();
     }
   }
 
@@ -327,7 +335,6 @@ console.log('Tentative de chargement de la vidéo depuis :', video.src);
     const progressBarWidth = canvas.width - 100;
     const progressBarX = 50;
 
-    // Calcul de la progression basée sur le média actuel uniquement
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     let progressPercentage = 0;
 
@@ -337,7 +344,7 @@ console.log('Tentative de chargement de la vidéo depuis :', video.src);
 
       if (currentMedia.type.startsWith('video')) {
         const video = this.videoElement.nativeElement;
-        elapsedTime = video.currentTime - (currentMedia.startTime || 0);
+        elapsedTime = video.currentTime;
       } else if (currentMedia.type.startsWith('image')) {
         elapsedTime = (performance.now() - this.imageStartTime) / 1000;
         if (this.imagePausedElapsed > 0 && !this.isPlaying) {
@@ -346,7 +353,7 @@ console.log('Tentative de chargement de la vidéo depuis :', video.src);
       }
 
       progressPercentage = mediaDuration > 0 ? (elapsedTime / mediaDuration) * 100 : 0;
-      progressPercentage = Math.min(100, Math.max(0, progressPercentage)); // Limiter entre 0 et 100%
+      progressPercentage = Math.min(100, Math.max(0, progressPercentage));
     }
 
     this.ctx.fillStyle = '#555';
@@ -358,26 +365,36 @@ console.log('Tentative de chargement de la vidéo depuis :', video.src);
     this.ctx.font = '18px Arial';
     this.ctx.fillText('⛶', canvas.width - 30, controlY + 25);
   }
-
   private nextMedia() {
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
+  
+    // Réinitialiser les variables d'état
     this.pausedAtTime = null;
     this.imagePausedElapsed = 0;
-    this.imageStartTime = 0; // Réinitialiser pour la prochaine image
-    this.currentMediaIndex++;
-
-    if (this.currentMediaIndex < this.mediaItems.length) {
-      this.playCurrentMedia();
-    } else {
-      // Fin de la liste : arrêter la lecture et garder la barre à 0 pour le prochain démarrage
-      this.isPlaying = false;
-      this.currentMediaIndex = 0;
-      this.cumulativeTime = 0; // Réinitialiser le temps cumulé
-      const canvas = this.canvasElement.nativeElement;
-      this.ctx.clearRect(0, 0, canvas.width, canvas.height);
-      this.drawControls();
+    this.imageStartTime = 0;
+  
+    const video = this.videoElement.nativeElement;
+    video.pause(); // S'assurer que la vidéo est arrêtée
+    video.currentTime = 0; // Réinitialiser la position de la vidéo
+  
+    if (this.mediaItems.length > 0) {
+      this.currentMediaIndex = (this.currentMediaIndex + 1) % this.mediaItems.length;
+  
+      // Réinitialiser cumulativeTime si on boucle au début
+      if (this.currentMediaIndex === 0) {
+        this.cumulativeTime = 0;
+      }
+  
+      // Jouer le prochain média uniquement si isPlaying est vrai
+      if (this.isPlaying) {
+        this.playCurrentMedia();
+      } else {
+        // Si pas en lecture, simplement dessiner le média actuel (utile pour selectedMedia)
+        this.playCurrentMedia();
+      }
     }
   }
 }

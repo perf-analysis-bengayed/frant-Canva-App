@@ -9,7 +9,9 @@ interface Media {
   endTime?: number;
   thumbnail?: string;
   originalDuration?: number;
+  source?: string; // Ajouter une propriété pour la source réelle
 }
+
 
 @Component({
   selector: 'app-sidebar',
@@ -22,7 +24,7 @@ export class SidebarComponent {
 
   mediaItems: Media[] = [];
   selectedMedia: Media | null = null;
-  private assetPath = 'src/assets/media/';
+
 
   selectMedia(media: Media) {
     this.selectedMedia = media;
@@ -33,24 +35,29 @@ export class SidebarComponent {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
       const file = input.files[0];
-      const newMedia: Media = {
-        name: file.name,
-        type: file.type,
-        thumbnail: URL.createObjectURL(file)
-      };
-
+  
       if (file.type.startsWith('video')) {
+        const newMedia: Media = {
+          name: file.name,
+          type: file.type,
+          // Conserver l’URL de la vidéo pour la lecture
+          source: URL.createObjectURL(file),
+          // On initialise thumbnail avec l’URL du fichier, qui sera remplacée après traitement
+          thumbnail: URL.createObjectURL(file)
+        };
+  
         const video = document.createElement('video');
         video.preload = 'metadata';
-        video.src = URL.createObjectURL(file);
-
+        // Utiliser la source réelle pour charger la vidéo
+        video.src = newMedia.source ?? "";
+  
         await new Promise<void>((resolve) => {
           video.onloadedmetadata = () => {
             newMedia.originalDuration = video.duration;
             newMedia.duration = video.duration;
             newMedia.startTime = 0;
             newMedia.endTime = newMedia.duration;
-
+  
             video.currentTime = 1;
             video.onseeked = () => {
               const canvas = document.createElement('canvas');
@@ -58,6 +65,7 @@ export class SidebarComponent {
               canvas.height = video.videoHeight;
               const ctx = canvas.getContext('2d');
               if (ctx) {
+                // Génère un thumbnail à partir de la vidéo
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 newMedia.thumbnail = canvas.toDataURL('image/jpeg');
               }
@@ -68,13 +76,19 @@ export class SidebarComponent {
           };
         });
       } else if (file.type.startsWith('image')) {
-        newMedia.duration = 5;
-        newMedia.startTime = 0;
-        newMedia.endTime = 5;
+        const newMedia: Media = {
+          name: file.name,
+          type: file.type,
+          thumbnail: URL.createObjectURL(file),
+          duration: 5,
+          startTime: 0,
+          endTime: 5
+        };
         this.addMedia(newMedia);
       }
     }
   }
+  
 
   addMedia(media: Media) {
     this.mediaItems.push(media);
@@ -107,8 +121,5 @@ export class SidebarComponent {
     this.mediaItemsChange.emit(this.mediaItems);
   }
 
-  private saveFileToAssets(file: File, path: string) {
-    console.log(`Saving ${file.name} to ${path}`);
-    // Implémentation réelle nécessiterait un service backend
-  }
+
 }
