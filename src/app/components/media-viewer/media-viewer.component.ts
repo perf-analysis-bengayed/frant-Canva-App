@@ -220,7 +220,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       this.playCurrentMedia();
     }
   }
-  private playCurrentMedia() {
+  private playCurrentMedia1() {
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
   
@@ -292,17 +292,71 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     }
   }
  
-
+  private playCurrentMedia() {
+    const currentMedia = this.mediaItems[this.currentMediaIndex];
+    if (!currentMedia) return;
+  
+    // Clear canvas
+    this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+  
+    if (currentMedia.type.startsWith('video')) {
+      const video = this.videoElement.nativeElement;
+      video.src = ''; // Reset source to force reload
+      const videoSource = currentMedia.source || `assets/${currentMedia.name}`; // Prioritize source over thumbnail
+      video.src = videoSource;
+  
+      video.onloadeddata = () => {
+        if (!currentMedia.duration) {
+          currentMedia.duration = video.duration;
+          this.calculateTotalDuration();
+        }
+        video.currentTime = this.pausedAtTime || 0; // Set to 0 or paused time
+        if (this.isPlaying) {
+          video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
+        }
+        this.renderVideoFrame(); // Render immediately, even if paused
+      };
+  
+      video.onerror = () => {
+        console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
+        // Instead of nextMedia(), show an error on canvas
+        this.ctx.fillStyle = 'red';
+        this.ctx.fillText(`Erreur: ${currentMedia.name}`, 10, 50);
+      };
+    } else if (currentMedia.type.startsWith('image')) {
+      const img = new Image();
+      img.src = currentMedia.thumbnail || currentMedia.source || 'assets/default-image.jpg';
+      img.onload = () => {
+        this.imageStartTime = performance.now() - (this.imagePausedElapsed || 0);
+        const drawImageFrame = (currentTime: number) => {
+          this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+          this.drawControls();
+          if (this.isPlaying) {
+            const elapsed = (currentTime - this.imageStartTime) / 1000;
+            this.updateCumulativeTime(elapsed);
+            if (elapsed >= (currentMedia.duration || 5)) {
+              this.nextMedia();
+            } else {
+              this.animationFrameId = requestAnimationFrame(drawImageFrame);
+            }
+          }
+        };
+        this.animationFrameId = requestAnimationFrame(drawImageFrame);
+      };
+      img.onerror = () => {
+        console.error(`Erreur de chargement de l'image : ${currentMedia.name}`);
+        this.ctx.fillStyle = 'red';
+        this.ctx.fillText(`Erreur: ${currentMedia.name}`, 10, 50);
+      };
+    }
+  }
   private renderVideoFrame() {
     const canvas = this.canvasElement.nativeElement;
     const video = this.videoElement.nativeElement;
-    if (!video.paused && !video.ended && this.isPlaying) {
-      this.ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      this.drawControls();
+    this.ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Draw current frame
+    this.drawControls();
+    if (this.isPlaying && !video.paused && !video.ended) {
       this.animationFrameId = requestAnimationFrame(() => this.renderVideoFrame());
-    } else if (!this.isPlaying) {
-      this.ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      this.drawControls();
     }
   }
 
@@ -396,5 +450,27 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
         this.playCurrentMedia();
       }
     }
+  }
+  selectMedia(index: number) {
+    this.currentMediaIndex = index;
+    this.cumulativeTime = this.mediaItems
+      .slice(0, this.currentMediaIndex)
+      .reduce((sum, media) => sum + (media.duration || 0), 0);
+    this.pausedAtTime = null;
+    this.imagePausedElapsed = 0;
+    
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+    
+    const video = this.videoElement.nativeElement;
+    video.pause(); 
+    
+   
+    this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+    
+   
+    this.playCurrentMedia();
   }
 }

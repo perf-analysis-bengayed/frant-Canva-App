@@ -3,32 +3,35 @@
     <h3>Canva</h3>
     <canvas #canvasElement></canvas>
     <video #videoElement style="display: none;"></video>
-    <!-- Timeline visuelle -->
+
     <div class="timeline">
       <div 
-        *ngFor="let media of mediaItems; let i = index" 
-        class="timeline-item"
-        [class.active]="i === currentMediaIndex"
-      >
-        <img 
-          *ngIf="media.type.startsWith('image')"
-          [src]="media.thumbnail || 'assets/default-image.jpg'" 
-          alt="thumbnail"
-          class="timeline-thumbnail"
-        >
-        <video 
-          *ngIf="media.type.startsWith('video')"
-          [poster]="media.thumbnail"
-          class="timeline-thumbnail"
-          muted
-          preload="metadata"
-        >
-          <source [src]="media.thumbnail || ('assets/' + media.name)" [type]="media.type">
-        </video>
-        <div class="timeline-info">
-          <p>{{ media.name }}</p>
-          <p>{{ media.startTime || 0 }}s - {{ media.endTime || media.duration || 0 }}s</p>
-        </div>
+      *ngFor="let media of mediaItems; let i = index" 
+      class="timeline-item"
+      [class.active]="i === currentMediaIndex"
+      (click)="selectMedia(i)" 
+    >
+    <img 
+    *ngIf="media.type.startsWith('image')"
+    [src]="media.thumbnail || 'assets/default-image.jpg'" 
+    alt="thumbnail"
+    class="timeline-thumbnail"
+  >
+  <video 
+    *ngIf="media.type.startsWith('video')"
+    [poster]="media.thumbnail"
+    class="timeline-thumbnail"
+    muted
+    preload="metadata"
+  >
+    <source [src]="media.source || ('assets/' + media.name)" [type]="media.type">
+  </video>
+  <div class="timeline-info">
+  <div (click)="selectMedia(i)" >
+    <p>{{ media.name }}</p>
+    <p>{{ media.startTime || 0 }}s - {{ media.endTime || media.duration || 0 }}s</p>
+  </div>
+</div>
       </div>
     </div>
   </div>

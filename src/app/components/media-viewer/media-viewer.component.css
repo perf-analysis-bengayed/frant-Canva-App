@@ -70,8 +70,10 @@ canvas {
 .timeline-info {
   text-align: center;
   margin-top: 5px;
+  transition: all 0.3s ease; /* Smooth transition for hover effects */
 }
 
+/* Default styles for paragraphs inside timeline-info */
 .timeline-info p {
   margin: 5px 0;
   font-size: 12px;
@@ -82,4 +84,23 @@ canvas {
 .timeline-info p:first-child {
   font-weight: bold;
   color: #333;
+}
+
+/* Hover effect to make it look like a button */
+.timeline-info:hover {
+  background-color: #f0f0f0; /* Light gray background like a button */
+  border: 1px solid #ccc; /* Border to define button edges */
+  border-radius: 5px; /* Rounded corners */
+  cursor: pointer; /* Hand cursor to indicate clickability */
+  padding: 5px; /* Add padding for button-like spacing */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+}
+
+/* Optional: Adjust text color on hover for better contrast */
+.timeline-info:hover p {
+  color: #555; /* Darker gray for regular text */
+}
+
+.timeline-info:hover p:first-child {
+  color: #000; /* Black for the bold text */
 }
