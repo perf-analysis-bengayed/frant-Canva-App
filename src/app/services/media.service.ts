@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { Media } from '../models/Media';
 
 @Injectable({
   providedIn: 'root'
