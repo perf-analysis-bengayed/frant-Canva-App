@@ -3,13 +3,14 @@
   
   <div class="media-controls">
     <input 
-      #fileInput
-      type="file" 
-      id="fileInput" 
-      accept="image/*,video/*"
-      (change)="onFileSelected($event)"
-      style="display: none"
-    >
+    #fileInput
+    type="file" 
+    id="fileInput" 
+    accept="image/*,.png,.jpeg,video/*,.mp4"
+    (change)="onFileSelected($event)"
+    style="display: none"
+  />
+  
     <button 
       (click)="fileInput.click()"
       class="select-button"

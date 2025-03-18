@@ -19,6 +19,7 @@ export class MediaSidebarService {
     const isImage = file.type.startsWith('image/') || imageExtensions.test(file.name);
 
     if (isVideo) {
+      console.log("test");
       return this.processVideo(file);
     } else if (isImage) {
       return this.processImage(file);
@@ -30,28 +31,33 @@ export class MediaSidebarService {
     return new Promise((resolve, reject) => {
       const newMedia: Media = {
         name: file.name,
-        type: file.type || 'video/mp4', // Valeur par défaut si type non détecté
+        type: file.type || 'video/mp4', // Fallback si aucun type n'est détecté
         source: URL.createObjectURL(file),
         thumbnail: ''
       };
-
+  
       const video = document.createElement('video');
       video.preload = 'metadata';
-      // Ajout des codecs supportés
-      video.setAttribute('type', 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
+      // Utiliser le type MIME du fichier s'il est disponible
+      if (file.type && file.type.startsWith('video/')) {
+        video.setAttribute('type', file.type);
+      } else {
+        // Valeur par défaut si le type n'est pas disponible (vous pouvez l'ajuster au besoin)
+        video.setAttribute('type', 'video/mp4');
+      }
       video.src = newMedia.source || '';
-
+  
       video.onloadedmetadata = () => {
         newMedia.originalDuration = video.duration;
         newMedia.duration = video.duration;
         newMedia.startTime = 0;
         newMedia.endTime = newMedia.duration;
-
-        // Essayer de générer une miniature à différents points si le premier échoue
+  
+        // Fonction pour tenter de générer une miniature à un moment donné
         const attemptThumbnail = (time: number) => {
           video.currentTime = time;
         };
-
+  
         video.onseeked = () => {
           const canvas = document.createElement('canvas');
           canvas.width = video.videoWidth || 640;
@@ -63,20 +69,21 @@ export class MediaSidebarService {
             resolve(newMedia);
           }
         };
-
+  
         video.onerror = () => {
-          // Si le premier essai échoue, essayer à t=0
+          // Si le premier essai échoue, tenter à t=0
           if (video.currentTime !== 0) {
             attemptThumbnail(0);
           } else {
             reject(new Error('Erreur de chargement de la vidéo'));
           }
         };
-
+  
         attemptThumbnail(1); // Premier essai à 1 seconde
       };
     });
   }
+  
   private processImage(file: File): Promise<Media> {
     return new Promise((resolve, reject) => {
       const newMedia: Media = {

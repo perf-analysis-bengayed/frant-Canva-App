@@ -466,78 +466,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
    
     this.playCurrentMedia();
   }
-  private playCurrentMedia() {
-    const currentMedia = this.mediaItems[this.currentMediaIndex];
-    if (!currentMedia) return;
-
-    this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-
-    if (currentMedia.type.startsWith('video') || /\.(mp4|avi|mov|wmv|webm|ogg|mkv|flv|3gp|mpeg|mpg|ts|vob)$/i.test(currentMedia.name)) {
-      const video = this.videoElement.nativeElement;
-      video.src = '';
-      video.src = currentMedia.source || currentMedia.thumbnail || `assets/${currentMedia.name}`;
-      video.muted = false;
-      
-      // Ajout d'attributs pour meilleure compatibilité
-      video.setAttribute('playsinline', 'true');
-      video.setAttribute('webkit-playsinline', 'true');
-
-      video.onloadeddata = () => {
-        if (!currentMedia.duration) {
-          currentMedia.duration = video.duration;
-          this.calculateTotalDuration();
-        }
-        video.currentTime = this.pausedAtTime || 0;
-        if (this.isPlaying) {
-          video.play().catch(err => {
-            console.error('Erreur de lecture vidéo :', err);
-            this.nextMedia();
-          });
-        }
-        this.renderVideoFrame();
-      };
-
-      video.onerror = () => {
-        console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
-        this.nextMedia();
-      };
-
-      video.ontimeupdate = () => {
-        const elapsed = video.currentTime;
-        this.updateCumulativeTime(elapsed);
-        if (elapsed >= (currentMedia.duration || video.duration)) {
-          video.pause();
-          this.nextMedia();
-        }
-      };
-    } else if (currentMedia.type.startsWith('image') || /\.(jpg|jpeg|png|gif|bmp|webp|tiff|tif|svg)$/i.test(currentMedia.name)) {
-      const img = new Image();
-      img.src = currentMedia.thumbnail || currentMedia.source || 'assets/default-image.jpg';
-      
-      img.onload = () => {
-        this.imageStartTime = performance.now() - (this.imagePausedElapsed || 0);
-        const duration = (currentMedia.duration || 5) * 1000;
-        const drawImageFrame = (currentTime: number) => {
-          if (!this.isPlaying) {
-            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-            this.drawControls();
-            return;
-          }
-          const elapsed = (currentTime - this.imageStartTime) / 1000;
-          this.updateCumulativeTime(elapsed);
-          if (elapsed >= (currentMedia.duration || 5)) {
-            this.nextMedia();
-          } else {
-            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-            this.drawControls();
-            this.animationFrameId = requestAnimationFrame(drawImageFrame);
-          }
-        };
-        this.animationFrameId = requestAnimationFrame(drawImageFrame);
-      };
-    }
-  }
-  private playCurrentMedia5() {
+  private playCurrentMedia3() {
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
 
@@ -609,7 +538,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     }
   }
   
-  private playCurrentMedia3() {
+  private playCurrentMedia() {
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
   
