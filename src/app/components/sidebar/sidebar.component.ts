@@ -1,7 +1,8 @@
 // sidebar.component.ts
 import { Component, Output, EventEmitter } from '@angular/core';
 import { CdkDragDrop } from '@angular/cdk/drag-drop';
-import { Media, MediaSidebarService } from '../../services/media-side-bar-service.service';
+import { MediaSidebarService } from '../../services/media-side-bar-service.service';
+import { Media } from '../../models/Media';
 
 @Component({
   selector: 'app-sidebar',

@@ -1,14 +1,7 @@
 import { Component, Input, Output, EventEmitter, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
+import { Media } from '../../models/Media';
 
-interface Media {
-  name: string;
-  type: string;
-  duration?: number;
-  startTime?: number;
-  endTime?: number;
-  thumbnail?: string;
-  originalDuration?: number;
-}
+
 
 @Component({
   selector: 'app-media-info',

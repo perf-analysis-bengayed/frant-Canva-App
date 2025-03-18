@@ -1,14 +1,7 @@
 import { Component, Input, AfterViewInit, ViewChild, ElementRef, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { Media } from '../../models/Media';
 
-interface Media {
-  name: string;
-  type: string;
-  duration?: number;
-  startTime?: number;
-  endTime?: number;
-  thumbnail?: string;
-  source?: string;
-}
+
 
 @Component({
   selector: 'app-media-viewer',
@@ -206,93 +199,18 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     }
   }
 
-  togglePositionMenu() {
-    this.showPositionMenu = !this.showPositionMenu;
-  }
+ 
 
-  setPosition(position: string) {
-    this.inputPosition = position;
-    this.showPositionMenu = false;
-  }
+
 
   private startMediaSequence() {
     if (this.mediaItems.length > 0 && this.isPlaying) {
       this.playCurrentMedia();
     }
   }
-  private playCurrentMedia1() {
-    const currentMedia = this.mediaItems[this.currentMediaIndex];
-    if (!currentMedia) return;
   
-    // Nettoyer le canvas avant de rendre un nouveau média
-    this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-  
-    if (currentMedia.type.startsWith('video')) {
-      const video = this.videoElement.nativeElement;
-  
-      // Réinitialiser la source pour éviter les problèmes de cache ou d'état précédent
-      video.src = '';
-      video.src = currentMedia.source || currentMedia.thumbnail || `assets/${currentMedia.name}`;
-      video.muted = false;
-  
-      video.onloadeddata = () => {
-        if (!currentMedia.duration) {
-          currentMedia.duration = video.duration;
-          this.calculateTotalDuration();
-        }
-        // Si pausedAtTime est défini (par exemple via seekTo ou pause), utiliser cette valeur
-        video.currentTime = this.pausedAtTime || 0;
-        if (this.isPlaying) {
-          video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
-        }
-        this.renderVideoFrame();
-      };
-  
-      video.onerror = () => {
-        console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
-        this.nextMedia();
-      };
-  
-      video.ontimeupdate = () => {
-        const elapsed = video.currentTime;
-        this.updateCumulativeTime(elapsed);
-        if (elapsed >= (currentMedia.duration || video.duration)) {
-          video.pause();
-          this.nextMedia();
-        }
-      };
-    } else if (currentMedia.type.startsWith('image')) {
-      const img = new Image();
-      img.src = currentMedia.thumbnail || 'assets/default-image.jpg';
-      img.onload = () => {
-        this.imageStartTime = performance.now() - (this.imagePausedElapsed || 0);
-        const duration = (currentMedia.duration || 5) * 1000;
-        const drawImageFrame = (currentTime: number) => {
-          if (!this.isPlaying) {
-            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-            this.drawControls();
-            return;
-          }
-          const elapsed = (currentTime - this.imageStartTime) / 1000;
-          this.updateCumulativeTime(elapsed);
-          if (elapsed >= (currentMedia.duration || 5)) {
-            this.nextMedia();
-          } else {
-            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-            this.drawControls();
-            this.animationFrameId = requestAnimationFrame(drawImageFrame);
-          }
-        };
-        this.animationFrameId = requestAnimationFrame(drawImageFrame);
-      };
-      img.onerror = () => {
-        console.error(`Erreur de chargement de l'image : ${currentMedia.name}`);
-        this.nextMedia();
-      };
-    }
-  }
  
-  private playCurrentMedia() {
+  private playCurrentMedia1() {
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
   
@@ -418,6 +336,77 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     this.ctx.fillStyle = '#fff';
     this.ctx.font = '18px Arial';
     this.ctx.fillText('⛶', canvas.width - 30, controlY + 25);
+  }
+  private playCurrentMedia() {
+    const currentMedia = this.mediaItems[this.currentMediaIndex];
+    if (!currentMedia) return;
+  
+    // Nettoyer le canvas avant de rendre un nouveau média
+    this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+  
+    if (currentMedia.type.startsWith('video')) {
+      const video = this.videoElement.nativeElement;
+  
+      // Réinitialiser la source pour éviter les problèmes de cache ou d'état précédent
+      video.src = '';
+      video.src = currentMedia.source || currentMedia.thumbnail || `assets/${currentMedia.name}`;
+      video.muted = false;
+  
+      video.onloadeddata = () => {
+        if (!currentMedia.duration) {
+          currentMedia.duration = video.duration;
+          this.calculateTotalDuration();
+        }
+        // Si pausedAtTime est défini (par exemple via seekTo ou pause), utiliser cette valeur
+        video.currentTime = this.pausedAtTime || 0;
+        if (this.isPlaying) {
+          video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
+        }
+        this.renderVideoFrame();
+      };
+  
+      video.onerror = () => {
+        console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
+        this.nextMedia();
+      };
+  
+      video.ontimeupdate = () => {
+        const elapsed = video.currentTime;
+        this.updateCumulativeTime(elapsed);
+        if (elapsed >= (currentMedia.duration || video.duration)) {
+          video.pause();
+          this.nextMedia();
+        }
+      };
+    } else if (currentMedia.type.startsWith('image')) {
+      const img = new Image();
+      img.src = currentMedia.thumbnail || 'assets/default-image.jpg';
+      img.onload = () => {
+        this.imageStartTime = performance.now() - (this.imagePausedElapsed || 0);
+        const duration = (currentMedia.duration || 5) * 1000;
+        const drawImageFrame = (currentTime: number) => {
+          if (!this.isPlaying) {
+            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+            this.drawControls();
+            return;
+          }
+          const elapsed = (currentTime - this.imageStartTime) / 1000;
+          this.updateCumulativeTime(elapsed);
+          if (elapsed >= (currentMedia.duration || 5)) {
+            this.nextMedia();
+          } else {
+            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+            this.drawControls();
+            this.animationFrameId = requestAnimationFrame(drawImageFrame);
+          }
+        };
+        this.animationFrameId = requestAnimationFrame(drawImageFrame);
+      };
+      img.onerror = () => {
+        console.error(`Erreur de chargement de l'image : ${currentMedia.name}`);
+        this.nextMedia();
+      };
+    }
   }
   private nextMedia() {
     if (this.animationFrameId) {
