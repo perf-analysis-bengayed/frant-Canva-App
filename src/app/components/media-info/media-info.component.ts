@@ -98,9 +98,9 @@ export class MediaInfoComponent implements AfterViewInit {
   }
   getFileNameWithoutExtension(fileName: string): string {
     const lastDotIndex = fileName.lastIndexOf('.');
-    return lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
+    const name = lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
+    return name.length > 10 ? name.substring(0, 10) + '...' : name; // Limite à 10 caractères avec "..."
   }
-
   getFileExtension(type: string): string {
     if (type.startsWith('image')) {
       return 'image';

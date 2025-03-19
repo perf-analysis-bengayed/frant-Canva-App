@@ -1,7 +1,17 @@
 import { Component, Input, AfterViewInit, ViewChild, ElementRef, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
-import { Media } from '../../models/Media';
 
-
+interface Media {
+  name: string;
+  type: string;
+  duration?: number;
+  startTime?: number;
+  endTime?: number;
+  thumbnail?: string;
+  originalDuration?: number;
+  source?: string;
+  overlayText?: string;
+  textPosition?: string;
+}
 
 @Component({
   selector: 'app-media-viewer',
@@ -12,7 +22,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   @Input() mediaItems: Media[] = [];
   @ViewChild('canvasElement') canvasElement!: ElementRef<HTMLCanvasElement>;
   @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
-
+  private pausedAtTime: number | null = null;
   currentMediaIndex = 0;
   totalDuration = 0;
   cumulativeTime = 0;
@@ -22,19 +32,16 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private isHoveringControls = false;
   private controlsVisible = true;
   private lastMouseMove = 0;
-
-  private pausedAtTime: number | null = null;
-  private imageStartTime: number = 0;
-  private imagePausedElapsed: number = 0;
-
-  overlayText: string = '';
-  inputPosition: string = 'top-right';
-  showPositionMenu: boolean = false;
+  private currentBlobUrls: string[] = [];
+  private mediaStartTime: number = 0;
+  private pausedElapsed: number = 0;
+  private drawCurrentFrame: (() => void) | null = null;
 
   private mouseMoveListener = (event: MouseEvent) => this.handleMouseMove(event);
   private canvasClickListener = (event: MouseEvent) => this.handleCanvasClick(event);
 
   @Input() selectedMedia?: Media;
+  @Input() durationChange: { media: Media, newDuration: number } | null = null;
 
   ngAfterViewInit() {
     this.setupCanvas();
@@ -42,9 +49,25 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     const canvas = this.canvasElement.nativeElement;
     canvas.addEventListener('mousemove', this.mouseMoveListener);
     canvas.addEventListener('click', this.canvasClickListener);
+    if (this.mediaItems.length > 0) {
+      this.playSequence();
+    }
   }
 
   ngOnChanges(changes: SimpleChanges) {
+    if (changes['mediaItems']) {
+      this.calculateTotalDuration();
+      this.playCurrentMedia();
+    }
+    if (changes['durationChange'] && this.durationChange) {
+      const { media, newDuration } = this.durationChange;
+      if (media === this.mediaItems[this.currentMediaIndex]) {
+        this.pauseSequence();
+        media.duration = newDuration;
+        this.calculateTotalDuration();
+        this.playCurrentMedia();
+      }
+    }
     if (changes['selectedMedia'] && this.selectedMedia) {
       const index = this.mediaItems.findIndex(item => item.name === this.selectedMedia!.name);
       if (index !== -1) {
@@ -52,30 +75,25 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
         this.cumulativeTime = this.mediaItems
           .slice(0, this.currentMediaIndex)
           .reduce((sum, media) => sum + (media.duration || 0), 0);
-        this.pausedAtTime = null;
-        this.imagePausedElapsed = 0;
-        if (this.animationFrameId) {
-          cancelAnimationFrame(this.animationFrameId);
-        }
+        this.pausedElapsed = 0;
+        if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
         const video = this.videoElement.nativeElement;
-        video.pause(); // Arrêter toute vidéo en cours
-        video.currentTime = 0; // Réinitialiser
+        video.pause();
+        video.currentTime = 0;
         this.playCurrentMedia();
       }
-    }
-    if (changes['mediaItems']) {
-      this.calculateTotalDuration();
-      this.playCurrentMedia();
     }
   }
 
   ngOnDestroy() {
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-    }
+    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+    const video = this.videoElement.nativeElement;
+    video.pause();
+    video.src = '';
+    video.load();
     this.mediaItems.forEach(media => {
       if (media.thumbnail) URL.revokeObjectURL(media.thumbnail);
-      if (media.source) URL.revokeObjectURL(media.source);
+      if (media.source && media.source.startsWith('blob:')) {URL.revokeObjectURL(media.source);}
     });
     const canvas = this.canvasElement.nativeElement;
     canvas.removeEventListener('mousemove', this.mouseMoveListener);
@@ -111,17 +129,16 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     const y = event.clientY - rect.top;
 
     if (y > canvas.height - 40) {
-      const progressBarStart = 50;
-      const progressBarWidth = canvas.width - 100;
-
       if (x >= 10 && x <= 40) {
         this.togglePlayPause();
-      } else if (x >= progressBarStart && x <= progressBarStart + progressBarWidth) {
-        const progressPercentage = (x - progressBarStart) / progressBarWidth;
+      } else if (x >= 50 && x <= canvas.width - 50) {
+        const progressPercentage = (x - 50) / (canvas.width - 100);
         this.seekTo(progressPercentage);
       } else if (x >= canvas.width - 40) {
         this.toggleFullscreen();
       }
+    } else {
+      this.togglePlayPause();
     }
   }
 
@@ -143,20 +160,15 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private pauseSequence() {
     if (this.isPlaying) {
       this.isPlaying = false;
-      if (this.animationFrameId) {
-        cancelAnimationFrame(this.animationFrameId);
-      }
+      if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
       const currentMedia = this.mediaItems[this.currentMediaIndex];
       if (currentMedia) {
+        this.pausedElapsed = (performance.now() - this.mediaStartTime) / 1000;
         if (currentMedia.type.startsWith('video')) {
-          const video = this.videoElement.nativeElement;
-          video.pause();
-          this.pausedAtTime = video.currentTime;
-        } else if (currentMedia.type.startsWith('image')) {
-          this.imagePausedElapsed = performance.now() - this.imageStartTime;
+          this.videoElement.nativeElement.pause();
         }
       }
-      this.drawControls(); // Update controls to reflect paused state
+      this.drawControls();
     }
   }
 
@@ -164,23 +176,15 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
 
-    const mediaDuration = currentMedia.duration || (currentMedia.type.startsWith('image') ? 5 : 0);
-    const newTime = progressPercentage * mediaDuration;
+    const setDuration = currentMedia.duration || (currentMedia.type.startsWith('image') ? 5 : this.videoElement.nativeElement.duration);
+    const newElapsed = progressPercentage * setDuration;
+
+    this.pausedElapsed = newElapsed;
+    this.mediaStartTime = performance.now() - this.pausedElapsed * 1000;
 
     if (currentMedia.type.startsWith('video')) {
       const video = this.videoElement.nativeElement;
-      const targetTime = newTime;
-      video.currentTime = targetTime;
-      this.pausedAtTime = targetTime;
-      this.cumulativeTime = this.mediaItems
-        .slice(0, this.currentMediaIndex)
-        .reduce((sum, media) => sum + (media.duration || 0), 0) + newTime;
-    } else if (currentMedia.type.startsWith('image')) {
-      this.imagePausedElapsed = newTime * 1000;
-      this.imageStartTime = performance.now() - this.imagePausedElapsed;
-      this.cumulativeTime = this.mediaItems
-        .slice(0, this.currentMediaIndex)
-        .reduce((sum, media) => sum + (media.duration || 0), 0) + newTime;
+      video.currentTime = newElapsed % video.duration;
     }
 
     if (this.isPlaying) {
@@ -193,19 +197,10 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   toggleFullscreen() {
     const canvas = this.canvasElement.nativeElement;
     if (!document.fullscreenElement) {
-      canvas.requestFullscreen().catch(err => console.error('Erreur plein écran :', err));
+      canvas.requestFullscreen().catch(err => console.error('Error entering fullscreen:', err));
     } else {
       document.exitFullscreen();
     }
-  }
-
-  togglePositionMenu() {
-    this.showPositionMenu = !this.showPositionMenu;
-  }
-
-  setPosition(position: string) {
-    this.inputPosition = position;
-    this.showPositionMenu = false;
   }
 
   private startMediaSequence() {
@@ -213,39 +208,58 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       this.playCurrentMedia();
     }
   }
-  private playCurrentMedia1() {
+
+  private playCurrentMedia() {
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
-  
-    // Nettoyer le canvas avant de rendre un nouveau média
+    this.currentBlobUrls.forEach(url => URL.revokeObjectURL(url));
+  this.currentBlobUrls = [];
     this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-  
+    this.mediaStartTime = performance.now() - (this.pausedElapsed * 1000);
+
     if (currentMedia.type.startsWith('video')) {
       const video = this.videoElement.nativeElement;
-  
-      // Réinitialiser la source pour éviter les problèmes de cache ou d'état précédent
       video.src = '';
       video.src = currentMedia.source || currentMedia.thumbnail || `assets/${currentMedia.name}`;
       video.muted = false;
-  
+
+      this.drawCurrentFrame = () => {
+        this.ctx.drawImage(video, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+        const currentMedia = this.mediaItems[this.currentMediaIndex];
+        
+        if (currentMedia && currentMedia.overlayText) {
+          const position = currentMedia.textPosition || 'top-right';
+          this.drawOverlayText(currentMedia.overlayText, position);
+        }
+      };
+      const handleVideoEnded = () => {
+        const elapsed = (performance.now() - this.mediaStartTime) / 1000;
+        const setDuration = currentMedia.duration || video.duration;
+        if (elapsed < setDuration) {
+          video.currentTime = 0;
+          video.play();
+
+        }
+      };
       video.onloadeddata = () => {
         if (!currentMedia.duration) {
           currentMedia.duration = video.duration;
           this.calculateTotalDuration();
         }
-        // Si pausedAtTime est défini (par exemple via seekTo ou pause), utiliser cette valeur
+        video.currentTime = this.pausedElapsed % video.duration;
+        video.addEventListener('ended', handleVideoEnded);
         video.currentTime = this.pausedAtTime || 0;
         if (this.isPlaying) {
           video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
         }
         this.renderVideoFrame();
       };
-  
+
       video.onerror = () => {
         console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
         this.nextMedia();
       };
-  
+
       video.ontimeupdate = () => {
         const elapsed = video.currentTime;
         this.updateCumulativeTime(elapsed);
@@ -256,76 +270,19 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       };
     } else if (currentMedia.type.startsWith('image')) {
       const img = new Image();
-      img.src = currentMedia.thumbnail || 'assets/default-image.jpg';
-      img.onload = () => {
-        this.imageStartTime = performance.now() - (this.imagePausedElapsed || 0);
-        const duration = (currentMedia.duration || 5) * 1000;
-        const drawImageFrame = (currentTime: number) => {
-          if (!this.isPlaying) {
-            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-            this.drawControls();
-            return;
-          }
-          const elapsed = (currentTime - this.imageStartTime) / 1000;
-          this.updateCumulativeTime(elapsed);
-          if (elapsed >= (currentMedia.duration || 5)) {
-            this.nextMedia();
-          } else {
-            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-            this.drawControls();
-            this.animationFrameId = requestAnimationFrame(drawImageFrame);
-          }
-        };
-        this.animationFrameId = requestAnimationFrame(drawImageFrame);
-      };
-      img.onerror = () => {
-        console.error(`Erreur de chargement de l'image : ${currentMedia.name}`);
-        this.nextMedia();
-      };
-    }
-  }
- 
-  private playCurrentMedia11() {
-    const currentMedia = this.mediaItems[this.currentMediaIndex];
-    if (!currentMedia) return;
-  
-    // Clear canvas
-    this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-  
-    if (currentMedia.type.startsWith('video')) {
-      const video = this.videoElement.nativeElement;
-      video.src = ''; // Reset source to force reload
-      const videoSource = currentMedia.source || `assets/${currentMedia.name}`; // Prioritize source over thumbnail
-      video.src = videoSource;
-  
-      video.onloadeddata = () => {
-        if (!currentMedia.duration) {
-          currentMedia.duration = video.duration;
-          this.calculateTotalDuration();
-        }
-        video.currentTime = this.pausedAtTime || 0; // Set to 0 or paused time
-        if (this.isPlaying) {
-          video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
-        }
-        this.renderVideoFrame(); // Render immediately, even if paused
-      };
-  
-      video.onerror = () => {
-        console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
-        // Instead of nextMedia(), show an error on canvas
-        this.ctx.fillStyle = 'red';
-        this.ctx.fillText(`Erreur: ${currentMedia.name}`, 10, 50);
-      };
-    } else if (currentMedia.type.startsWith('image')) {
-      const img = new Image();
       img.src = currentMedia.thumbnail || currentMedia.source || 'assets/default-image.jpg';
       img.onload = () => {
-        this.imageStartTime = performance.now() - (this.imagePausedElapsed || 0);
-        const drawImageFrame = (currentTime: number) => {
+        this.drawCurrentFrame = () => {
           this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+          if (currentMedia.overlayText) {
+            this.drawOverlayText(currentMedia.overlayText, currentMedia.textPosition || '0');
+          }
+        };
+        const drawImageFrame = (currentTime: number) => {
+          this.drawCurrentFrame?.();
           this.drawControls();
           if (this.isPlaying) {
-            const elapsed = (currentTime - this.imageStartTime) / 1000;
+            const elapsed = (currentTime - this.mediaStartTime) / 1000;
             this.updateCumulativeTime(elapsed);
             if (elapsed >= (currentMedia.duration || 5)) {
               this.nextMedia();
@@ -338,19 +295,58 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       };
       img.onerror = () => {
         console.error(`Erreur de chargement de l'image : ${currentMedia.name}`);
-        this.ctx.fillStyle = 'red';
-        this.ctx.fillText(`Erreur: ${currentMedia.name}`, 10, 50);
+        this.nextMedia();
       };
     }
   }
+
   private renderVideoFrame() {
-    const canvas = this.canvasElement.nativeElement;
-    const video = this.videoElement.nativeElement;
-    this.ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Draw current frame
+    this.drawCurrentFrame?.();
     this.drawControls();
+    const video = this.videoElement.nativeElement;
     if (this.isPlaying && !video.paused && !video.ended) {
       this.animationFrameId = requestAnimationFrame(() => this.renderVideoFrame());
     }
+  }
+
+  private drawOverlayText(text: string, position: string) {
+    const canvas = this.canvasElement.nativeElement;
+    this.ctx.font = '30px Arial';
+    this.ctx.fillStyle = 'white';
+    this.ctx.textAlign = 'left';
+
+    let x: number;
+    let y: number;
+
+    switch (position) {
+      case '0': // Gauche Haut
+        x = 10;
+        y = 30;
+        break;
+      case '1': // Droite Haut
+        x = canvas.width - 10;
+        this.ctx.textAlign = 'right';
+        y = 30;
+        break;
+      case '2': // Gauche Bas
+        x = 10;
+        y = canvas.height - 60;
+        break;
+      case '3': // Droite Bas
+        x = canvas.width - 10;
+        this.ctx.textAlign = 'right';
+        y = canvas.height - 60;
+        break;
+      case '4': // Centre
+        x = canvas.width / 2;
+        y = canvas.height / 2;
+        this.ctx.textAlign = 'center';
+        break;
+      default:
+        x = 10;
+        y = 30;
+    }
+    this.ctx.fillText(text, x, y);
   }
 
   private updateCumulativeTime(elapsed: number) {
@@ -386,20 +382,9 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     let progressPercentage = 0;
 
     if (currentMedia) {
-      const mediaDuration = currentMedia.duration || (currentMedia.type.startsWith('image') ? 5 : 0);
-      let elapsedTime = 0;
-
-      if (currentMedia.type.startsWith('video')) {
-        const video = this.videoElement.nativeElement;
-        elapsedTime = video.currentTime;
-      } else if (currentMedia.type.startsWith('image')) {
-        elapsedTime = (performance.now() - this.imageStartTime) / 1000;
-        if (this.imagePausedElapsed > 0 && !this.isPlaying) {
-          elapsedTime = this.imagePausedElapsed / 1000;
-        }
-      }
-
-      progressPercentage = mediaDuration > 0 ? (elapsedTime / mediaDuration) * 100 : 0;
+      const setDuration = currentMedia.duration || (currentMedia.type.startsWith('image') ? 5 : this.videoElement.nativeElement.duration);
+      const elapsed = this.isPlaying ? (performance.now() - this.mediaStartTime) / 1000 : this.pausedElapsed;
+      progressPercentage = setDuration > 0 ? (elapsed / setDuration) * 100 : 0;
       progressPercentage = Math.min(100, Math.max(0, progressPercentage));
     }
 
@@ -412,202 +397,55 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     this.ctx.font = '18px Arial';
     this.ctx.fillText('⛶', canvas.width - 30, controlY + 25);
   }
+
   private nextMedia() {
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
-  
-    // Réinitialiser les variables d'état
-    this.pausedAtTime = null;
-    this.imagePausedElapsed = 0;
-    this.imageStartTime = 0;
-  
+
+    this.pausedElapsed = 0;
     const video = this.videoElement.nativeElement;
-    video.pause(); // S'assurer que la vidéo est arrêtée
-    video.currentTime = 0; // Réinitialiser la position de la vidéo
-  
+    video.pause();
+    video.currentTime = 0;
+
     if (this.mediaItems.length > 0) {
       this.currentMediaIndex = (this.currentMediaIndex + 1) % this.mediaItems.length;
-  
-      // Réinitialiser cumulativeTime si on boucle au début
-      if (this.currentMediaIndex === 0) {
-        this.cumulativeTime = 0;
-      }
-  
-      // Jouer le prochain média uniquement si isPlaying est vrai
-      if (this.isPlaying) {
-        this.playCurrentMedia();
-      } else {
-        // Si pas en lecture, simplement dessiner le média actuel (utile pour selectedMedia)
-        this.playCurrentMedia();
-      }
+      if (this.currentMediaIndex === 0) this.cumulativeTime = 0;
+      this.playCurrentMedia();
     }
   }
+
   selectMedia(index: number) {
     this.currentMediaIndex = index;
     this.cumulativeTime = this.mediaItems
       .slice(0, this.currentMediaIndex)
       .reduce((sum, media) => sum + (media.duration || 0), 0);
-    this.pausedAtTime = null;
-    this.imagePausedElapsed = 0;
-    
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-    
+    this.pausedElapsed = 0;
+
+    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     const video = this.videoElement.nativeElement;
-    video.pause(); 
-    
-   
+    video.play();
+
     this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-    
-   
     this.playCurrentMedia();
+
   }
-  private playCurrentMedia3() {
-    const currentMedia = this.mediaItems[this.currentMediaIndex];
-    if (!currentMedia) return;
 
-    this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-
-    if (currentMedia.type.startsWith('video') || /\.(mp4|avi|mov|wmv|webm|ogg|mkv|flv|3gp|mpeg|mpg|ts|vob)$/i.test(currentMedia.name)) {
-      const video = this.videoElement.nativeElement;
-      video.src = '';
-      video.src = currentMedia.source || currentMedia.thumbnail || `assets/${currentMedia.name}`;
-      video.muted = false;
-      
-      // Ajout d'attributs pour meilleure compatibilité
-      video.setAttribute('playsinline', 'true');
-      video.setAttribute('webkit-playsinline', 'true');
-
-      video.onloadeddata = () => {
-        if (!currentMedia.duration) {
-          currentMedia.duration = video.duration;
-          this.calculateTotalDuration();
-        }
-        video.currentTime = this.pausedAtTime || 0;
-        if (this.isPlaying) {
-          video.play().catch(err => {
-            console.error('Erreur de lecture vidéo :', err);
-            this.nextMedia();
-          });
-        }
-        this.renderVideoFrame();
-      };
-
-      video.onerror = () => {
-        console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
-        this.nextMedia();
-      };
-
-      video.ontimeupdate = () => {
-        const elapsed = video.currentTime;
-        this.updateCumulativeTime(elapsed);
-        if (elapsed >= (currentMedia.duration || video.duration)) {
-          video.pause();
-          this.nextMedia();
-        }
-      };
-    } else if (currentMedia.type.startsWith('image') || /\.(jpg|jpeg|png|gif|bmp|webp|tiff|tif|svg)$/i.test(currentMedia.name)) {
-      const img = new Image();
-      img.src = currentMedia.thumbnail || currentMedia.source || 'assets/default-image.jpg';
-      
-      img.onload = () => {
-        this.imageStartTime = performance.now() - (this.imagePausedElapsed || 0);
-        const duration = (currentMedia.duration || 5) * 1000;
-        const drawImageFrame = (currentTime: number) => {
-          if (!this.isPlaying) {
-            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-            this.drawControls();
-            return;
-          }
-          const elapsed = (currentTime - this.imageStartTime) / 1000;
-          this.updateCumulativeTime(elapsed);
-          if (elapsed >= (currentMedia.duration || 5)) {
-            this.nextMedia();
-          } else {
-            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-            this.drawControls();
-            this.animationFrameId = requestAnimationFrame(drawImageFrame);
-          }
-        };
-        this.animationFrameId = requestAnimationFrame(drawImageFrame);
-      };
+  onTextPositionChange() {
+    this.playCurrentMedia(); // Redraw the current frame with updated text/position
+  }
+  getFileExtension(type: string): string {
+    if (type.startsWith('image')) {
+      return 'image';
+    } else if (type.startsWith('video')) {
+      return 'vidéo';
     }
+    return 'inconnu';
   }
-  
-  private playCurrentMedia() {
-    const currentMedia = this.mediaItems[this.currentMediaIndex];
-    if (!currentMedia) return;
-  
-    // Nettoyer le canvas avant de rendre un nouveau média
-    this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-  
-    if (currentMedia.type.startsWith('video')) {
-      const video = this.videoElement.nativeElement;
-  
-      // Réinitialiser la source pour éviter les problèmes de cache ou d'état précédent
-      video.src = '';
-      video.src = currentMedia.source || currentMedia.thumbnail || `assets/${currentMedia.name}`;
-      video.muted = false;
-  
-      video.onloadeddata = () => {
-        if (!currentMedia.duration) {
-          currentMedia.duration = video.duration;
-          this.calculateTotalDuration();
-        }
-        // Si pausedAtTime est défini (par exemple via seekTo ou pause), utiliser cette valeur
-        video.currentTime = this.pausedAtTime || 0;
-        if (this.isPlaying) {
-          video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
-        }
-        this.renderVideoFrame();
-      };
-  
-      video.onerror = () => {
-        console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
-        this.nextMedia();
-      };
-  
-      video.ontimeupdate = () => {
-        const elapsed = video.currentTime;
-        this.updateCumulativeTime(elapsed);
-        if (elapsed >= (currentMedia.duration || video.duration)) {
-          video.pause();
-          this.nextMedia();
-        }
-      };
-    } else if (currentMedia.type.startsWith('image')) {
-      const img = new Image();
-      img.src = currentMedia.thumbnail || 'assets/default-image.jpg';
-      img.onload = () => {
-        this.imageStartTime = performance.now() - (this.imagePausedElapsed || 0);
-        const duration = (currentMedia.duration || 5) * 1000;
-        const drawImageFrame = (currentTime: number) => {
-          if (!this.isPlaying) {
-            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-            this.drawControls();
-            return;
-          }
-          const elapsed = (currentTime - this.imageStartTime) / 1000;
-          this.updateCumulativeTime(elapsed);
-          if (elapsed >= (currentMedia.duration || 5)) {
-            this.nextMedia();
-          } else {
-            this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-            this.drawControls();
-            this.animationFrameId = requestAnimationFrame(drawImageFrame);
-          }
-        };
-        this.animationFrameId = requestAnimationFrame(drawImageFrame);
-      };
-      img.onerror = () => {
-        console.error(`Erreur de chargement de l'image : ${currentMedia.name}`);
-        this.nextMedia();
-      };
-    }
+  getFileNameWithoutExtension(fileName: string): string {
+    const lastDotIndex = fileName.lastIndexOf('.');
+    const name = lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
+    return name.length > 10 ? name.substring(0, 10) + '...' : name; // Limite à 10 caractères avec "..."
   }
-  
 }

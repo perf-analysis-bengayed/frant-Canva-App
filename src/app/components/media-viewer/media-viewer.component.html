@@ -4,35 +4,58 @@
     <canvas #canvasElement></canvas>
     <video #videoElement style="display: none;"></video>
 
+    <!-- Overlay text input and position selector -->
+    <div *ngIf="mediaItems[currentMediaIndex]?.type?.startsWith('video') || mediaItems[currentMediaIndex]?.type?.startsWith('image')">
+      <input 
+        type="text" 
+        placeholder="Entrez le texte" 
+        [(ngModel)]="mediaItems[currentMediaIndex].overlayText" 
+        (change)="onTextPositionChange()"
+      >
+      <select 
+        [(ngModel)]="mediaItems[currentMediaIndex].textPosition" 
+        (change)="onTextPositionChange()"
+      >
+        <option value="0">Gauche Haut</option>
+        <option value="2">Gauche Bas</option>
+        <option value="1">Droite Haut</option>
+        <option value="3">Droite Bas</option>
+        <option value="4">Centre</option>
+      </select>
+    </div>
+
     <div class="timeline">
       <div 
-      *ngFor="let media of mediaItems; let i = index" 
-      class="timeline-item"
-      [class.active]="i === currentMediaIndex"
-      (click)="selectMedia(i)" 
-    >
-    <img 
-    *ngIf="media.type.startsWith('image')"
-    [src]="media.thumbnail || 'assets/default-image.jpg'" 
-    alt="thumbnail"
-    class="timeline-thumbnail"
-  >
-  <video 
-    *ngIf="media.type.startsWith('video')"
-    [poster]="media.thumbnail"
-    class="timeline-thumbnail"
-    muted
-    preload="metadata"
-  >
-    <source [src]="media.source || ('assets/' + media.name)" [type]="media.type">
-  </video>
-  <div class="timeline-info">
-  <div (click)="selectMedia(i)" >
-    <p>{{ media.name }}</p>
-    <p>{{ media.startTime || 0 }}s - {{ media.endTime || media.duration || 0 }}s</p>
-  </div>
-</div>
+        *ngFor="let media of mediaItems; let i = index" 
+        class="timeline-item"
+        [class.active]="i === currentMediaIndex"
+        (click)="selectMedia(i)" 
+      >
+        <img 
+          *ngIf="media.type.startsWith('image')"
+          [src]="media.thumbnail || 'assets/default-image.jpg'" 
+          alt="thumbnail"
+          class="timeline-thumbnail"
+        >
+        <video 
+          *ngIf="media.type.startsWith('video')"
+          [poster]="media.thumbnail"
+          class="timeline-thumbnail"
+          muted
+          preload="metadata"
+        >
+          <source [src]="media.source || ('assets/' + media.name)" [type]="media.type">
+        </video>
+        <div class="timeline-info">
+          <div (click)="selectMedia(i)">
+            <p >{{ getFileNameWithoutExtension(media.name) }}</p>
+            <p>{{ getFileExtension(media.type) }}</p>
+            <p>{{ (media.startTime || 0) | number:'1.2-2' }}s - {{ (media.endTime || media.duration || 0) | number:'1.2-2' }}s</p>
+          </div>
+        </div>
+        
       </div>
     </div>
+
   </div>
 </div>
