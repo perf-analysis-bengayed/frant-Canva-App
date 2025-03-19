@@ -4,7 +4,7 @@
     <canvas #canvasElement></canvas>
     <video #videoElement style="display: none;"></video>
 
-    <!-- Overlay text input and position selector -->
+  
     <div *ngIf="mediaItems[currentMediaIndex]?.type?.startsWith('video') || mediaItems[currentMediaIndex]?.type?.startsWith('image')">
       <input 
         type="text" 
@@ -23,14 +23,14 @@
         <option value="4">Centre</option>
       </select>
     </div>
-
     <div class="timeline">
       <div 
-        *ngFor="let media of mediaItems; let i = index" 
-        class="timeline-item"
-        [class.active]="i === currentMediaIndex"
-        (click)="selectMedia(i)" 
-      >
+      *ngFor="let media of mediaItems; let i = index" 
+      class="timeline-item"
+      [style.width.%]="totalDuration > 0 ? (getEffectiveDuration(media) / totalDuration) * 100 : 0"
+      [class.active]="i === currentMediaIndex"
+      (click)="selectMedia(i)"
+    >
         <img 
           *ngIf="media.type.startsWith('image')"
           [src]="media.thumbnail || 'assets/default-image.jpg'" 
@@ -47,15 +47,11 @@
           <source [src]="media.source || ('assets/' + media.name)" [type]="media.type">
         </video>
         <div class="timeline-info">
-          <div (click)="selectMedia(i)">
-            <p >{{ getFileNameWithoutExtension(media.name) }}</p>
-            <p>{{ getFileExtension(media.type) }}</p>
-            <p>{{ (media.startTime || 0) | number:'1.2-2' }}s - {{ (media.endTime || media.duration || 0) | number:'1.2-2' }}s</p>
-          </div>
+          <p>{{ getFileNameWithoutExtension(media.name) }}</p>
+          <p>{{ getFileExtension(media.type) }}</p>
+          <p>{{ (media.startTime || 0) | number:'1.2-2' }}s - {{ (media.endTime || media.duration || 0) | number:'1.2-2' }}s</p>
         </div>
-        
       </div>
     </div>
-
   </div>
 </div>

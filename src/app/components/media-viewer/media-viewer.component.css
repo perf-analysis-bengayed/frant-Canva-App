@@ -34,18 +34,29 @@ canvas {
   cursor: pointer;
 }
 
+
+
+/* Hover effect to make it look like a button */
+.timeline:hover {
+
+  border-radius: 5px; /* Rounded corners */
+  cursor: pointer; /* Hand cursor to indicate clickability */
+ 
+
+}
+
+
 .timeline {
   display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  gap: 10px;
+  
+  flex-wrap: nowrap; 
+  width: 100%;       
+  overflow-x: auto;  
   padding: 10px 0;
-  border-top: 1px solid #ddd;
 }
 
 .timeline-item {
-  flex: 0 0 auto;
-  width: 120px;
+  flex: 0 0 auto;   /* Respecte la largeur définie */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -53,7 +64,7 @@ canvas {
   background-color: #fff;
   border: 1px solid #ccc;
   border-radius: 4px;
-  transition: border-color 0.3s;
+  min-width: 50px;  /* Largeur minimale pour lisibilité */
 }
 
 .timeline-item.active {
@@ -69,38 +80,5 @@ canvas {
 
 .timeline-info {
   text-align: center;
-  margin-top: 5px;
-  transition: all 0.3s ease; /* Smooth transition for hover effects */
- 
-}
-
-/* Default styles for paragraphs inside timeline-info */
-.timeline-info p {
-  margin: 5px 0;
-  font-size: 12px;
-  color: #888;
-  text-align: right;
-}
-
-.timeline-info p:first-child {
-  font-weight: bold;
-  color: #333;
-}
-
-/* Hover effect to make it look like a button */
-.timeline:hover {
-
-  border-radius: 5px; /* Rounded corners */
-  cursor: pointer; /* Hand cursor to indicate clickability */
- 
-
-}
-
-/* Optional: Adjust text color on hover for better contrast */
-.timeline-info:hover p {
-  color: #555; /* Darker gray for regular text */
-}
-
-.timeline-info:hover p:first-child {
-  color: #000; /* Black for the bold text */
+  font-size: 14px;
 }

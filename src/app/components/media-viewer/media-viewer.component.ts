@@ -1,4 +1,5 @@
 import { Component, Input, AfterViewInit, ViewChild, ElementRef, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 
 interface Media {
   name: string;
@@ -39,7 +40,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
 
   private mouseMoveListener = (event: MouseEvent) => this.handleMouseMove(event);
   private canvasClickListener = (event: MouseEvent) => this.handleCanvasClick(event);
-
+  private mediaItemsSubject = new BehaviorSubject<Media[]>([]);
   @Input() selectedMedia?: Media;
   @Input() durationChange: { media: Media, newDuration: number } | null = null;
 
@@ -53,6 +54,8 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       this.playSequence();
     }
   }
+
+
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['mediaItems']) {
@@ -84,6 +87,9 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       }
     }
   }
+  getEffectiveDuration(media: Media): number {
+    return media.duration || (media.type.startsWith('image') ? 5 : 5); // 5s par défaut
+  }
 
   ngOnDestroy() {
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
@@ -102,7 +108,8 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
 
   private calculateTotalDuration() {
     this.totalDuration = this.mediaItems.reduce((sum, media) => {
-      return sum + (media.duration || (media.type.startsWith('image') ? 5 : 0));
+      return sum + (this.getEffectiveDuration(media) || (media.type.startsWith('image') ? 5 : 0));
+
     }, 0);
   }
 
@@ -424,8 +431,8 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     this.pausedElapsed = 0;
 
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
-    const video = this.videoElement.nativeElement;
-    video.play();
+    
+    this.playSequence();
 
     this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
     this.playCurrentMedia();
