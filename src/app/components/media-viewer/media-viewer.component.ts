@@ -40,7 +40,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
 
   private mouseMoveListener = (event: MouseEvent) => this.handleMouseMove(event);
   private canvasClickListener = (event: MouseEvent) => this.handleCanvasClick(event);
-  private mediaItemsSubject = new BehaviorSubject<Media[]>([]);
+ 
   @Input() selectedMedia?: Media;
   @Input() durationChange: { media: Media, newDuration: number } | null = null;
 
@@ -266,7 +266,12 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
         console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
         this.nextMedia();
       };
-
+      video.oncanplay = () => {
+        if (this.isPlaying) {
+          video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
+        }
+        this.renderVideoFrame();
+      };
       video.ontimeupdate = () => {
         const elapsed = video.currentTime;
         this.updateCumulativeTime(elapsed);
