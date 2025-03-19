@@ -48,7 +48,6 @@ canvas {
 
 .timeline {
   display: flex;
-  
   flex-wrap: nowrap; 
   width: 100%;       
   overflow-x: auto;  
@@ -56,7 +55,7 @@ canvas {
 }
 
 .timeline-item {
-  flex: 0 0 auto;   /* Respecte la largeur définie */
+    
   display: flex;
   flex-direction: column;
   align-items: center;
