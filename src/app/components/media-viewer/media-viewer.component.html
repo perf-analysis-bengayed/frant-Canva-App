@@ -46,11 +46,7 @@
         >
           <source [src]="media.source || ('assets/' + media.name)" [type]="media.type">
         </video>
-        <div class="timeline-info">
-          <p>{{ getFileNameWithoutExtension(media.name) }}</p>
-          <p>{{ getFileExtension(media.type) }}</p>
-          <p>{{ (media.startTime || 0) | number:'1.2-2' }}s - {{ (media.endTime || media.duration || 0) | number:'1.2-2' }}s</p>
-        </div>
+      
       </div>
     </div>
   </div>

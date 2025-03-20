@@ -1,4 +1,4 @@
-import { Component, Input, AfterViewInit, ViewChild, ElementRef, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, AfterViewInit, ViewChild, ElementRef, OnDestroy, OnChanges, SimpleChanges, ChangeDetectorRef } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 
 interface Media {
@@ -37,13 +37,14 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private mediaStartTime: number = 0;
   private pausedElapsed: number = 0;
   private drawCurrentFrame: (() => void) | null = null;
-
+  private mediaItemsSubject = new BehaviorSubject<any[]>([]);
+  mediaItems$ = this.mediaItemsSubject.asObservable();
   private mouseMoveListener = (event: MouseEvent) => this.handleMouseMove(event);
   private canvasClickListener = (event: MouseEvent) => this.handleCanvasClick(event);
  
   @Input() selectedMedia?: Media;
   @Input() durationChange: { media: Media, newDuration: number } | null = null;
-
+  constructor(private cdr: ChangeDetectorRef) {}
   ngAfterViewInit() {
     this.setupCanvas();
     this.calculateTotalDuration();
@@ -56,8 +57,8 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   }
 
 
-
   ngOnChanges(changes: SimpleChanges) {
+
     if (changes['mediaItems']) {
       this.calculateTotalDuration();
       this.playCurrentMedia();
@@ -87,8 +88,10 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       }
     }
   }
-  getEffectiveDuration(media: Media): number {
-    return media.duration || (media.type.startsWith('image') ? 5 : 5); // 5s par défaut
+
+
+  getEffectiveDuration(media: any): number {
+    return media.duration || 0;
   }
 
   ngOnDestroy() {
@@ -105,12 +108,11 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     canvas.removeEventListener('mousemove', this.mouseMoveListener);
     canvas.removeEventListener('click', this.canvasClickListener);
   }
-
-  private calculateTotalDuration() {
+  private calculateTotalDuration(): void {
     this.totalDuration = this.mediaItems.reduce((sum, media) => {
       return sum + (this.getEffectiveDuration(media) || (media.type.startsWith('image') ? 5 : 0));
-
     }, 0);
+    this.cdr.detectChanges(); // Forcer la mise à jour de la vue
   }
 
   private setupCanvas() {
@@ -252,6 +254,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
         if (!currentMedia.duration) {
           currentMedia.duration = video.duration;
           this.calculateTotalDuration();
+          this.cdr.detectChanges();
         }
         video.currentTime = this.pausedElapsed % video.duration;
         video.addEventListener('ended', handleVideoEnded);
@@ -447,17 +450,6 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   onTextPositionChange() {
     this.playCurrentMedia(); // Redraw the current frame with updated text/position
   }
-  getFileExtension(type: string): string {
-    if (type.startsWith('image')) {
-      return 'image';
-    } else if (type.startsWith('video')) {
-      return 'vidéo';
-    }
-    return 'inconnu';
-  }
-  getFileNameWithoutExtension(fileName: string): string {
-    const lastDotIndex = fileName.lastIndexOf('.');
-    const name = lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
-    return name.length > 10 ? name.substring(0, 10) + '...' : name; // Limite à 10 caractères avec "..."
-  }
+
+
 }

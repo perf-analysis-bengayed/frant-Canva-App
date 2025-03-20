@@ -1,8 +1,6 @@
 import { Component, Input, Output, EventEmitter, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { Media } from '../../models/Media';
 
-
-
 @Component({
   selector: 'app-media-info',
   templateUrl: './media-info.component.html',
@@ -13,17 +11,22 @@ export class MediaInfoComponent implements AfterViewInit {
   @Output() dragStart = new EventEmitter<Media>();
   @Output() durationChange = new EventEmitter<void>();
   @Output() timeChange = new EventEmitter<void>();
-  @Output() trimVideo = new EventEmitter<{startTime: number, duration: number}>();
+  @Output() trimVideo = new EventEmitter<{ startTime: number; duration: number }>();
   @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
 
-  maxVideoDuration = 60;
+  maxVideoDuration: number = 0; // Initialisé à 0, sera mis à jour dynamiquement
 
   ngAfterViewInit() {
     if (this.media.type.startsWith('video')) {
-      this.checkVideoDuration();
-      if (!this.media.thumbnail) {
-        this.generateVideoThumbnail();
-      }
+      const video = this.videoElement.nativeElement;
+      video.onloadedmetadata = () => {
+        this.maxVideoDuration = video.duration; // Récupère la durée réelle de la vidéo
+        this.media.originalDuration = video.duration; // Stocke la durée originale si besoin
+        this.checkVideoDuration();
+        if (!this.media.thumbnail) {
+          this.generateVideoThumbnail();
+        }
+      };
     }
   }
 
@@ -41,8 +44,6 @@ export class MediaInfoComponent implements AfterViewInit {
     } else if (this.media.type.startsWith('image')) {
       if (this.media.duration !== undefined) {
         this.media.duration = Math.max(5, this.media.duration);
-       
-
       }
     }
     this.updateEndTime();
@@ -96,11 +97,13 @@ export class MediaInfoComponent implements AfterViewInit {
       }
     };
   }
+
   getFileNameWithoutExtension(fileName: string): string {
     const lastDotIndex = fileName.lastIndexOf('.');
     const name = lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
-    return name.length > 10 ? name.substring(0, 10) + '...' : name; // Limite à 10 caractères avec "..."
+    return name.length > 10 ? name.substring(0, 10) + '...' : name;
   }
+
   getFileExtension(type: string): string {
     if (type.startsWith('image')) {
       return 'image';
@@ -109,6 +112,4 @@ export class MediaInfoComponent implements AfterViewInit {
     }
     return 'inconnu';
   }
-  
-
 }
