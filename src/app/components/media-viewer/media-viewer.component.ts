@@ -37,8 +37,8 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private mediaStartTime: number = 0;
   private pausedElapsed: number = 0;
   private drawCurrentFrame: (() => void) | null = null;
-  private mediaItemsSubject = new BehaviorSubject<any[]>([]);
-  mediaItems$ = this.mediaItemsSubject.asObservable();
+
+ 
   private mouseMoveListener = (event: MouseEvent) => this.handleMouseMove(event);
   private canvasClickListener = (event: MouseEvent) => this.handleCanvasClick(event);
  
