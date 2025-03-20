@@ -221,9 +221,13 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private playCurrentMedia() {
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
+
     this.currentBlobUrls.forEach(url => URL.revokeObjectURL(url));
   this.currentBlobUrls = [];
     this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
+
+
+    
     this.mediaStartTime = performance.now() - (this.pausedElapsed * 1000);
 
     if (currentMedia.type.startsWith('video')) {
@@ -372,7 +376,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     this.cumulativeTime = Math.min(this.cumulativeTime, this.totalDuration);
   }
 
-  private drawControls() {
+  private drawControls1() {
     const canvas = this.canvasElement.nativeElement;
     const controlHeight = 40;
     const controlY = canvas.height - controlHeight;
@@ -390,7 +394,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     this.ctx.font = '18px Arial';
     this.ctx.fillText(this.isPlaying ? '❚❚' : '▶', 20, controlY + 25);
 
-    const progressBarWidth = canvas.width - 100;
+    const progressBarWidth = canvas.width - 90;
     const progressBarX = 50;
 
     const currentMedia = this.mediaItems[this.currentMediaIndex];
@@ -404,15 +408,66 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     }
 
     this.ctx.fillStyle = '#555';
-    this.ctx.fillRect(progressBarX, controlY + 15, progressBarWidth, 4);
+    this.ctx.fillRect(progressBarX, controlY + 14, progressBarWidth, 4);
     this.ctx.fillStyle = '#f00';
-    this.ctx.fillRect(progressBarX, controlY + 15, (progressPercentage / 100) * progressBarWidth, 4);
+    this.ctx.fillRect(progressBarX, controlY + 14, (progressPercentage / 100) * progressBarWidth, 4);
 
     this.ctx.fillStyle = '#fff';
     this.ctx.font = '18px Arial';
-    this.ctx.fillText('⛶', canvas.width - 30, controlY + 25);
+    // this.ctx.fillText('⛶', canvas.width - 30, controlY + 25);
   }
+  private drawControls() {
+    const canvas = this.canvasElement.nativeElement;
+    const controlHeight = 40;
+    const controlY = canvas.height - controlHeight;
+  
+    // Hide controls if no mouse movement for 3 seconds and not hovering
+    if (Date.now() - this.lastMouseMove > 3000 && !this.isHoveringControls) {
+      this.controlsVisible = false;
+    }
+  
+    if (!this.controlsVisible) return;
+  
+    this.ctx.save(); // Save the zoomed state
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transformation to identity matrix
+    this.ctx.fillStyle = 'rgba(15, 15, 15, 0.8)';
+    this.ctx.fillRect(0, controlY, canvas.width, controlHeight);
 
+    // Draw play/pause button
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = '18px Arial';
+    this.ctx.fillText(this.isPlaying ? '❚❚' : '▶', 20, controlY + 30);
+  
+    // Draw progress bar next to the play/pause button
+    const progressBarX = 50; // Start after the play/pause button
+    const progressBarWidth = canvas.width - 100; // Leave space for fullscreen button
+    const progressBarHeight = 4;
+    const progressBarY = controlY +5+ (controlHeight - progressBarHeight) / 2; // Center vertically
+  
+    const currentMedia = this.mediaItems[this.currentMediaIndex];
+    let progressPercentage = 0;
+  
+    if (currentMedia) {
+      const setDuration = currentMedia.duration || (currentMedia.type.startsWith('image') ? 5 : this.videoElement.nativeElement.duration);
+      const elapsed = this.isPlaying ? (performance.now() - this.mediaStartTime) / 1000 : this.pausedElapsed;
+      progressPercentage = setDuration > 0 ? (elapsed / setDuration) * 100 : 0;
+      progressPercentage = Math.min(100, Math.max(0, progressPercentage));
+    }
+  
+    // Draw progress bar background
+    this.ctx.fillStyle = '#555';
+    this.ctx.fillRect(progressBarX, progressBarY, progressBarWidth, progressBarHeight);
+  
+    // Draw progress bar fill
+    this.ctx.fillStyle = '#f00';
+    this.ctx.fillRect(progressBarX, progressBarY, (progressPercentage / 100) * progressBarWidth, progressBarHeight);
+  
+    // // Draw fullscreen button at the end
+    // this.ctx.fillStyle = '#fff';
+    // this.ctx.font = '18px Arial';
+    // this.ctx.fillText('⛶', canvas.width - 32, controlY + 25);
+    // this.ctx.restore();
+  }
   private nextMedia() {
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
