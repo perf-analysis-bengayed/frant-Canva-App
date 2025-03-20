@@ -1,17 +1,19 @@
 import { Component, Input, AfterViewInit, ViewChild, ElementRef, OnDestroy, OnChanges, SimpleChanges, ChangeDetectorRef } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
 
-interface Media {
+export interface TextOverlay {
+  overlayText: string;
+  textPosition: string;
+  startTime: number;
+  displayDuration: number;
+}
+
+export interface Media {
   name: string;
   type: string;
   duration?: number;
-  startTime?: number;
-  endTime?: number;
-  thumbnail?: string;
-  originalDuration?: number;
   source?: string;
-  overlayText?: string;
-  textPosition?: string;
+  thumbnail?: string;
+  texts: TextOverlay[]; 
 }
 
 @Component({
@@ -27,6 +29,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   currentMediaIndex = 0;
   totalDuration = 0;
   cumulativeTime = 0;
+  scale = 50; // Échelle pour les barres (50 pixels par seconde)
   private ctx!: CanvasRenderingContext2D;
   private animationFrameId: number | null = null;
   private isPlaying = false;
@@ -38,13 +41,14 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private pausedElapsed: number = 0;
   private drawCurrentFrame: (() => void) | null = null;
 
- 
   private mouseMoveListener = (event: MouseEvent) => this.handleMouseMove(event);
   private canvasClickListener = (event: MouseEvent) => this.handleCanvasClick(event);
- 
+
   @Input() selectedMedia?: Media;
   @Input() durationChange: { media: Media, newDuration: number } | null = null;
+
   constructor(private cdr: ChangeDetectorRef) {}
+
   ngAfterViewInit() {
     this.setupCanvas();
     this.calculateTotalDuration();
@@ -56,18 +60,22 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     }
   }
 
-
   ngOnChanges(changes: SimpleChanges) {
-
     if (changes['mediaItems']) {
+      // Normalisation des médias pour garantir la présence de texts
+      this.mediaItems = (changes['mediaItems'].currentValue as Media[]).map(item => ({
+        ...item,
+        texts: item.texts || [] 
+      }));
       this.calculateTotalDuration();
       this.playCurrentMedia();
     }
     if (changes['durationChange'] && this.durationChange) {
       const { media, newDuration } = this.durationChange;
-      if (media === this.mediaItems[this.currentMediaIndex]) {
+      const localMedia = this.mediaItems.find(m => m.name === media.name);
+      if (localMedia) {
         this.pauseSequence();
-        media.duration = newDuration;
+        localMedia.duration = newDuration;
         this.calculateTotalDuration();
         this.playCurrentMedia();
       }
@@ -78,7 +86,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
         this.currentMediaIndex = index;
         this.cumulativeTime = this.mediaItems
           .slice(0, this.currentMediaIndex)
-          .reduce((sum, media) => sum + (media.duration || 0), 0);
+          .reduce((sum, media) => sum + this.getEffectiveDuration(media), 0);
         this.pausedElapsed = 0;
         if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
         const video = this.videoElement.nativeElement;
@@ -89,9 +97,8 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     }
   }
 
-
-  getEffectiveDuration(media: any): number {
-    return media.duration || 0;
+  getEffectiveDuration(media: Media): number {
+    return media.duration || (media.type.startsWith('image') ? 5 : 0);
   }
 
   ngOnDestroy() {
@@ -102,17 +109,18 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     video.load();
     this.mediaItems.forEach(media => {
       if (media.thumbnail) URL.revokeObjectURL(media.thumbnail);
-      if (media.source && media.source.startsWith('blob:')) {URL.revokeObjectURL(media.source);}
+      if (media.source && media.source.startsWith('blob:')) URL.revokeObjectURL(media.source);
     });
     const canvas = this.canvasElement.nativeElement;
     canvas.removeEventListener('mousemove', this.mouseMoveListener);
     canvas.removeEventListener('click', this.canvasClickListener);
   }
+
   private calculateTotalDuration(): void {
     this.totalDuration = this.mediaItems.reduce((sum, media) => {
-      return sum + (this.getEffectiveDuration(media) || (media.type.startsWith('image') ? 5 : 0));
+      return sum + this.getEffectiveDuration(media);
     }, 0);
-    this.cdr.detectChanges(); // Forcer la mise à jour de la vue
+    this.cdr.detectChanges();
   }
 
   private setupCanvas() {
@@ -185,7 +193,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
 
-    const setDuration = currentMedia.duration || (currentMedia.type.startsWith('image') ? 5 : this.videoElement.nativeElement.duration);
+    const setDuration = this.getEffectiveDuration(currentMedia);
     const newElapsed = progressPercentage * setDuration;
 
     this.pausedElapsed = newElapsed;
@@ -193,7 +201,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
 
     if (currentMedia.type.startsWith('video')) {
       const video = this.videoElement.nativeElement;
-      video.currentTime = newElapsed % video.duration;
+      video.currentTime = newElapsed % (video.duration || setDuration);
     }
 
     if (this.isPlaying) {
@@ -221,13 +229,9 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private playCurrentMedia() {
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
-
     this.currentBlobUrls.forEach(url => URL.revokeObjectURL(url));
-  this.currentBlobUrls = [];
+    this.currentBlobUrls = [];
     this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-
-
-    
     this.mediaStartTime = performance.now() - (this.pausedElapsed * 1000);
 
     if (currentMedia.type.startsWith('video')) {
@@ -238,31 +242,20 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
 
       this.drawCurrentFrame = () => {
         this.ctx.drawImage(video, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-        const currentMedia = this.mediaItems[this.currentMediaIndex];
-        
-        if (currentMedia && currentMedia.overlayText) {
-          const position = currentMedia.textPosition || 'top-right';
-          this.drawOverlayText(currentMedia.overlayText, position);
-        }
+        currentMedia.texts.forEach(text => {
+          if (this.isTextVisible(text)) {
+            this.drawOverlayText(text.overlayText, text.textPosition);
+          }
+        });
       };
-      const handleVideoEnded = () => {
-        const elapsed = (performance.now() - this.mediaStartTime) / 1000;
-        const setDuration = currentMedia.duration || video.duration;
-        if (elapsed < setDuration) {
-          video.currentTime = 0;
-          video.play();
 
-        }
-      };
       video.onloadeddata = () => {
         if (!currentMedia.duration) {
           currentMedia.duration = video.duration;
           this.calculateTotalDuration();
           this.cdr.detectChanges();
         }
-        video.currentTime = this.pausedElapsed % video.duration;
-        video.addEventListener('ended', handleVideoEnded);
-        video.currentTime = this.pausedAtTime || 0;
+        video.currentTime = this.pausedElapsed % (video.duration || this.getEffectiveDuration(currentMedia));
         if (this.isPlaying) {
           video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
         }
@@ -273,16 +266,18 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
         console.error(`Erreur de chargement de la vidéo : ${currentMedia.name}`);
         this.nextMedia();
       };
+
       video.oncanplay = () => {
         if (this.isPlaying) {
           video.play().catch(err => console.error('Erreur de lecture vidéo :', err));
         }
         this.renderVideoFrame();
       };
+
       video.ontimeupdate = () => {
         const elapsed = video.currentTime;
         this.updateCumulativeTime(elapsed);
-        if (elapsed >= (currentMedia.duration || video.duration)) {
+        if (elapsed >= this.getEffectiveDuration(currentMedia)) {
           video.pause();
           this.nextMedia();
         }
@@ -293,9 +288,11 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       img.onload = () => {
         this.drawCurrentFrame = () => {
           this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
-          if (currentMedia.overlayText) {
-            this.drawOverlayText(currentMedia.overlayText, currentMedia.textPosition || '0');
-          }
+          currentMedia.texts.forEach(text => {
+            if (this.isTextVisible(text)) {
+              this.drawOverlayText(text.overlayText, text.textPosition);
+            }
+          });
         };
         const drawImageFrame = (currentTime: number) => {
           this.drawCurrentFrame?.();
@@ -303,7 +300,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
           if (this.isPlaying) {
             const elapsed = (currentTime - this.mediaStartTime) / 1000;
             this.updateCumulativeTime(elapsed);
-            if (elapsed >= (currentMedia.duration || 5)) {
+            if (elapsed >= this.getEffectiveDuration(currentMedia)) {
               this.nextMedia();
             } else {
               this.animationFrameId = requestAnimationFrame(drawImageFrame);
@@ -326,6 +323,13 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     if (this.isPlaying && !video.paused && !video.ended) {
       this.animationFrameId = requestAnimationFrame(() => this.renderVideoFrame());
     }
+  }
+
+  private isTextVisible(text: TextOverlay): boolean {
+    const elapsed = (performance.now() - this.mediaStartTime) / 1000;
+    const startTime = text.startTime || 0;
+    const displayDuration = text.displayDuration || this.getEffectiveDuration(this.mediaItems[this.currentMediaIndex]);
+    return elapsed >= startTime && elapsed <= (startTime + displayDuration);
   }
 
   private drawOverlayText(text: string, position: string) {
@@ -371,103 +375,58 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private updateCumulativeTime(elapsed: number) {
     const previousMediaDuration = this.mediaItems
       .slice(0, this.currentMediaIndex)
-      .reduce((sum, media) => sum + (media.duration || 0), 0);
+      .reduce((sum, media) => sum + this.getEffectiveDuration(media), 0);
     this.cumulativeTime = Math.max(0, previousMediaDuration + elapsed);
     this.cumulativeTime = Math.min(this.cumulativeTime, this.totalDuration);
   }
 
-  private drawControls1() {
-    const canvas = this.canvasElement.nativeElement;
-    const controlHeight = 40;
-    const controlY = canvas.height - controlHeight;
-
-    if (Date.now() - this.lastMouseMove > 3000 && !this.isHoveringControls) {
-      this.controlsVisible = false;
-    }
-
-    if (!this.controlsVisible) return;
-
-    this.ctx.fillStyle = 'rgba(15, 15, 15, 0.8)';
-    this.ctx.fillRect(0, controlY, canvas.width, controlHeight);
-
-    this.ctx.fillStyle = '#fff';
-    this.ctx.font = '18px Arial';
-    this.ctx.fillText(this.isPlaying ? '❚❚' : '▶', 20, controlY + 25);
-
-    const progressBarWidth = canvas.width - 90;
-    const progressBarX = 50;
-
-    const currentMedia = this.mediaItems[this.currentMediaIndex];
-    let progressPercentage = 0;
-
-    if (currentMedia) {
-      const setDuration = currentMedia.duration || (currentMedia.type.startsWith('image') ? 5 : this.videoElement.nativeElement.duration);
-      const elapsed = this.isPlaying ? (performance.now() - this.mediaStartTime) / 1000 : this.pausedElapsed;
-      progressPercentage = setDuration > 0 ? (elapsed / setDuration) * 100 : 0;
-      progressPercentage = Math.min(100, Math.max(0, progressPercentage));
-    }
-
-    this.ctx.fillStyle = '#555';
-    this.ctx.fillRect(progressBarX, controlY + 14, progressBarWidth, 4);
-    this.ctx.fillStyle = '#f00';
-    this.ctx.fillRect(progressBarX, controlY + 14, (progressPercentage / 100) * progressBarWidth, 4);
-
-    this.ctx.fillStyle = '#fff';
-    this.ctx.font = '18px Arial';
-    // this.ctx.fillText('⛶', canvas.width - 30, controlY + 25);
-  }
   private drawControls() {
     const canvas = this.canvasElement.nativeElement;
     const controlHeight = 40;
     const controlY = canvas.height - controlHeight;
-  
-    // Hide controls if no mouse movement for 3 seconds and not hovering
+
     if (Date.now() - this.lastMouseMove > 3000 && !this.isHoveringControls) {
       this.controlsVisible = false;
     }
-  
+
     if (!this.controlsVisible) return;
-  
-    this.ctx.save(); // Save the zoomed state
-    this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transformation to identity matrix
+
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.fillStyle = 'rgba(15, 15, 15, 0.8)';
     this.ctx.fillRect(0, controlY, canvas.width, controlHeight);
 
-    // Draw play/pause button
     this.ctx.fillStyle = '#fff';
     this.ctx.font = '18px Arial';
-    this.ctx.fillText(this.isPlaying ? '❚❚' : '▶', 20, controlY + 30);
-  
-    // Draw progress bar next to the play/pause button
-    const progressBarX = 50; // Start after the play/pause button
-    const progressBarWidth = canvas.width - 100; // Leave space for fullscreen button
+    this.ctx.fillText(this.isPlaying ? '❚❚' : '▶', 20, controlY + 31);
+
+    const progressBarX = 50;
+    const progressBarWidth = canvas.width - 100;
     const progressBarHeight = 4;
-    const progressBarY = controlY +5+ (controlHeight - progressBarHeight) / 2; // Center vertically
-  
+    const progressBarY = controlY +5+ (controlHeight - progressBarHeight) / 2;
+
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     let progressPercentage = 0;
-  
+
     if (currentMedia) {
-      const setDuration = currentMedia.duration || (currentMedia.type.startsWith('image') ? 5 : this.videoElement.nativeElement.duration);
+      const setDuration = this.getEffectiveDuration(currentMedia);
       const elapsed = this.isPlaying ? (performance.now() - this.mediaStartTime) / 1000 : this.pausedElapsed;
       progressPercentage = setDuration > 0 ? (elapsed / setDuration) * 100 : 0;
       progressPercentage = Math.min(100, Math.max(0, progressPercentage));
     }
-  
-    // Draw progress bar background
+
     this.ctx.fillStyle = '#555';
     this.ctx.fillRect(progressBarX, progressBarY, progressBarWidth, progressBarHeight);
-  
-    // Draw progress bar fill
     this.ctx.fillStyle = '#f00';
     this.ctx.fillRect(progressBarX, progressBarY, (progressPercentage / 100) * progressBarWidth, progressBarHeight);
-  
-    // // Draw fullscreen button at the end
-    // this.ctx.fillStyle = '#fff';
-    // this.ctx.font = '18px Arial';
-    // this.ctx.fillText('⛶', canvas.width - 32, controlY + 25);
-    // this.ctx.restore();
+
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = '18px Arial';
+    this.ctx.fillText('⛶', canvas.width - 32, controlY + 30);
+
+    this.ctx.restore();
   }
+
   private nextMedia() {
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
@@ -490,21 +449,89 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     this.currentMediaIndex = index;
     this.cumulativeTime = this.mediaItems
       .slice(0, this.currentMediaIndex)
-      .reduce((sum, media) => sum + (media.duration || 0), 0);
+      .reduce((sum, media) => sum + this.getEffectiveDuration(media), 0);
     this.pausedElapsed = 0;
 
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
-    
+
     this.playSequence();
 
     this.ctx.clearRect(0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
     this.playCurrentMedia();
-
   }
 
   onTextPositionChange() {
     this.playCurrentMedia(); // Redraw the current frame with updated text/position
   }
 
+  addText() {
+    const currentMedia = this.mediaItems[this.currentMediaIndex];
+    if (currentMedia) {
+      currentMedia.texts.push({
+        overlayText: '',
+        textPosition: '0',
+        startTime: 0,
+        displayDuration: 5
+      });
+      this.onTextChange();
+    }
+  }
 
+  removeText(index: number) {
+    const currentMedia = this.mediaItems[this.currentMediaIndex];
+    if (currentMedia && currentMedia.texts[index]) {
+      currentMedia.texts.splice(index, 1);
+      this.onTextChange();
+    }
+  }
+
+  onTextChange() {
+    this.cdr.detectChanges();
+    this.playCurrentMedia();
+  }
+
+  /** Retourne le libellé de la position en fonction de sa valeur */
+  getPositionLabel(position: string): string {
+    switch (position) {
+      case '0': return 'Gauche Haut';
+      case '1': return 'Droite Haut';
+      case '2': return 'Gauche Bas';
+      case '3': return 'Droite Bas';
+      case '4': return 'Centre';
+      default: return '';
+    }
+  }
+
+  /** Retourne les textes associés à une position donnée avec leurs startGlobal et endGlobal */
+  getTextsForPosition(position: string): any[] {
+    const texts = [];
+    for (const media of this.mediaItems) {
+      const mediaStartGlobal = this.getMediaStartGlobal(media);
+      for (const text of media.texts) {
+        if (text.textPosition === position && text.overlayText) {
+          const textStartGlobal = mediaStartGlobal + (text.startTime || 0);
+          const textEndGlobal = textStartGlobal + (text.displayDuration || 0);
+          texts.push({
+            text: text.overlayText,
+            startGlobal: textStartGlobal,
+            endGlobal: textEndGlobal
+          });
+        }
+      }
+    }
+    return texts;
+  }
+
+  /** Calcule le startGlobal d'un média en fonction de sa position dans la séquence */
+  private getMediaStartGlobal(media: Media): number {
+    const index = this.mediaItems.indexOf(media);
+    return this.mediaItems
+      .slice(0, index)
+      .reduce((sum, m) => sum + this.getEffectiveDuration(m), 0);
+  }
+
+  /** Calcule le endGlobal d'un média */
+  private getMediaEndGlobal(media: Media): number {
+    return this.getMediaStartGlobal(media) + this.getEffectiveDuration(media);
+  }
 }

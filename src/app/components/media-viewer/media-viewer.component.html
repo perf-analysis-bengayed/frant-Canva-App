@@ -3,35 +3,67 @@
     <h3>Canva</h3>
     <canvas #canvasElement></canvas>
     <video #videoElement style="display: none;"></video>
-
-  
-    <div *ngIf="mediaItems[currentMediaIndex]?.type?.startsWith('video') || mediaItems[currentMediaIndex]?.type?.startsWith('image')">
-      <input 
-        type="text" 
-        placeholder="Entrez le texte" 
-        [(ngModel)]="mediaItems[currentMediaIndex].overlayText" 
-        (change)="onTextPositionChange()"
-      >
-      <select 
-        [(ngModel)]="mediaItems[currentMediaIndex].textPosition" 
-        (change)="onTextPositionChange()"
-      >
-        <option value="0">Gauche Haut</option>
-        <option value="2">Gauche Bas</option>
-        <option value="1">Droite Haut</option>
-        <option value="3">Droite Bas</option>
-        <option value="4">Centre</option>
-      </select>
-      
+<!-- Conteneur des barres de position -->
+<div *ngFor="let position of ['0', '1', '2', '3', '4']">
+  <h5> {{ position }}</h5>
+  <div class="timeline-bar">
+    <div 
+      *ngFor="let text of getTextsForPosition(position)" 
+      [style.left]="text.startGlobal * scale + 'px'" 
+      [style.width]="(text.endGlobal - text.startGlobal) * scale + 'px'"
+    >
+      {{ text.text }}
     </div>
+  </div>
+</div>
+    <!-- Inputs pour le texte, la position, startTime et displayDuration -->
+    <div >
+      <h4>Ajouter des textes à la vidéo</h4>
+      <div *ngFor="let text of mediaItems[currentMediaIndex].texts; let i = index">
+        <input 
+          type="text" 
+          placeholder="Entrez le texte" 
+          [(ngModel)]="text.overlayText" 
+          (change)="onTextChange()"
+        >
+        <select 
+          [(ngModel)]="text.textPosition" 
+          (change)="onTextChange()"
+        >
+          <option value="0">Gauche Haut</option>
+          <option value="1">Droite Haut</option>
+          <option value="2">Gauche Bas</option>
+          <option value="3">Droite Bas</option>
+          <option value="4">Centre</option>
+        </select>
+        <input 
+          type="number" 
+          placeholder="Début (s)" 
+          [(ngModel)]="text.startTime" 
+          (change)="onTextChange()" 
+          min="0"
+        >
+        <input 
+          type="number" 
+          placeholder="Durée (s)" 
+          [(ngModel)]="text.displayDuration" 
+          (change)="onTextChange()" 
+          min="0"
+        >
+        <!-- <button (click)="removeText(i)">Supprimer</button> -->
+      </div>
+      <button (click)="addText()">Ajouter un texte</button>
+    </div>
+
+    <!-- Timeline ou autres éléments existants -->
     <div class="timeline">
       <div 
-      *ngFor="let media of mediaItems; let i = index" 
-      class="timeline-item"
-      [style.width.%]="totalDuration > 0 ? (getEffectiveDuration(media) / totalDuration) * 100 : 0"
-      [class.active]="i === currentMediaIndex"
-      (click)="selectMedia(i)"
-    >
+        *ngFor="let media of mediaItems; let i = index" 
+        class="timeline-item"
+        [style.width.%]="totalDuration > 0 ? (getEffectiveDuration(media) / totalDuration) * 100 : 0"
+        [class.active]="i === currentMediaIndex"
+        (click)="selectMedia(i)"
+      >
         <img 
           *ngIf="media.type.startsWith('image')"
           [src]="media.thumbnail || 'assets/default-image.jpg'" 
@@ -47,7 +79,6 @@
         >
           <source [src]="media.source || ('assets/' + media.name)" [type]="media.type">
         </video>
-      
       </div>
     </div>
   </div>

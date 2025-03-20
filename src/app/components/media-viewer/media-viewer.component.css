@@ -76,3 +76,31 @@ canvas {
   border-radius: 4px;
 }
 
+.position-bars {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+}
+
+.position-bar {
+  margin-bottom: 10px;
+}
+
+.bar {
+  position: relative;
+  height: 20px;
+  background-color: #ddd;
+}
+
+.text-item {
+  position: absolute;
+  height: 100%;
+  background-color: #4caf50;
+  color: white;
+  padding: 2px 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
