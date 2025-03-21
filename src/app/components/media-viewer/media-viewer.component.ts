@@ -1,4 +1,4 @@
-import { Component, Input, AfterViewInit, ViewChild, ElementRef, OnDestroy, OnChanges, SimpleChanges, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, AfterViewInit, ViewChild, ElementRef, OnDestroy, OnChanges, SimpleChanges, ChangeDetectorRef, EventEmitter, Output } from '@angular/core';
 
 export interface TextOverlay {
   overlayText: string;
@@ -25,6 +25,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   @Input() mediaItems: Media[] = [];
   @ViewChild('canvasElement') canvasElement!: ElementRef<HTMLCanvasElement>;
   @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
+  @Output() mediaItemsChange = new EventEmitter<Media[]>();
   private pausedAtTime: number | null = null;
   currentMediaIndex = 0;
   totalDuration = 0;
@@ -39,6 +40,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   private currentBlobUrls: string[] = [];
   private mediaStartTime: number = 0;
   private pausedElapsed: number = 0;
+  private isFullscreen = false;
   private drawCurrentFrame: (() => void) | null = null;
 
   private mouseMoveListener = (event: MouseEvent) => this.handleMouseMove(event);
@@ -49,7 +51,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
 
   constructor(private cdr: ChangeDetectorRef) {}
 
-  ngAfterViewInit() {
+  ngAfterViewInit1() {
     this.setupCanvas();
     this.calculateTotalDuration();
     const canvas = this.canvasElement.nativeElement;
@@ -59,17 +61,41 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       this.playSequence();
     }
   }
-
+  ngAfterViewInit() {
+    this.setupCanvas();
+    this.calculateTotalDuration();
+    const canvas = this.canvasElement.nativeElement;
+    canvas.addEventListener('mousemove', this.mouseMoveListener);
+    canvas.addEventListener('click', this.canvasClickListener);
+  
+    // Add fullscreen change listener
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && this.isFullscreen) {
+        this.isFullscreen = false;
+        this.restoreCanvasSize();
+        this.playCurrentMedia();
+      } else if (document.fullscreenElement && !this.isFullscreen) {
+        this.isFullscreen = true;
+        this.resizeCanvasToFullscreen();
+        this.playCurrentMedia();
+      }
+    });
+  
+    if (this.mediaItems.length > 0) {
+      this.playSequence();
+    }
+  }
+  
   ngOnChanges(changes: SimpleChanges) {
     if (changes['mediaItems']) {
-      // Normalisation des médias pour garantir la présence de texts
       this.mediaItems = (changes['mediaItems'].currentValue as Media[]).map(item => ({
         ...item,
-        texts: item.texts || [] 
+        texts: item.texts || []
       }));
       this.calculateTotalDuration();
       this.playCurrentMedia();
     }
+
     if (changes['durationChange'] && this.durationChange) {
       const { media, newDuration } = this.durationChange;
       const localMedia = this.mediaItems.find(m => m.name === media.name);
@@ -101,7 +127,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     return media.duration || (media.type.startsWith('image') ? 5 : 0);
   }
 
-  ngOnDestroy() {
+  ngOnDestroy1() {
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     const video = this.videoElement.nativeElement;
     video.pause();
@@ -115,7 +141,21 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     canvas.removeEventListener('mousemove', this.mouseMoveListener);
     canvas.removeEventListener('click', this.canvasClickListener);
   }
-
+  ngOnDestroy() {
+    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+    const video = this.videoElement.nativeElement;
+    video.pause();
+    video.src = '';
+    video.load();
+    this.mediaItems.forEach(media => {
+      if (media.thumbnail) URL.revokeObjectURL(media.thumbnail);
+      if (media.source && media.source.startsWith('blob:')) URL.revokeObjectURL(media.source);
+    });
+    const canvas = this.canvasElement.nativeElement;
+    canvas.removeEventListener('mousemove', this.mouseMoveListener);
+    canvas.removeEventListener('click', this.canvasClickListener);
+    document.removeEventListener('fullscreenchange', () => {}); // Remove fullscreen listener
+  }
   private calculateTotalDuration(): void {
     this.totalDuration = this.mediaItems.reduce((sum, media) => {
       return sum + this.getEffectiveDuration(media);
@@ -212,14 +252,31 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   }
 
   toggleFullscreen() {
+    console.log('Bouton plein écran cliqué');
     const canvas = this.canvasElement.nativeElement;
     if (!document.fullscreenElement) {
-      canvas.requestFullscreen().catch(err => console.error('Error entering fullscreen:', err));
+      canvas.requestFullscreen().catch(err => console.error('Erreur entrant plein écran :', err));
     } else {
-      document.exitFullscreen();
+      document.exitFullscreen().catch(err => console.error('Erreur sortant plein écran :', err));
     }
   }
-
+  private resizeCanvasToFullscreen() {
+    const canvas = this.canvasElement.nativeElement;
+    canvas.width = window.screen.width;
+    canvas.height = window.screen.height;
+    this.ctx = canvas.getContext('2d')!;
+    console.log('Canvas resized to', canvas.width, canvas.height);
+    // Test avec un dessin simple
+    this.ctx.fillStyle = 'blue';
+    this.ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  
+  private restoreCanvasSize() {
+    const canvas = this.canvasElement.nativeElement;
+    canvas.width = 800; // Original width
+    canvas.height = 450; // Original height
+    this.ctx = canvas.getContext('2d')!; // Reinitialize context after resize
+  }
   private startMediaSequence() {
     if (this.mediaItems.length > 0 && this.isPlaying) {
       this.playCurrentMedia();
@@ -227,6 +284,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   }
 
   private playCurrentMedia() {
+    console.log('Playing media at size', this.canvasElement.nativeElement.width, 'x', this.canvasElement.nativeElement.height);
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (!currentMedia) return;
     this.currentBlobUrls.forEach(url => URL.revokeObjectURL(url));
@@ -321,7 +379,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     this.drawControls();
     const video = this.videoElement.nativeElement;
     if (this.isPlaying && !video.paused && !video.ended) {
-      this.animationFrameId = requestAnimationFrame(() => this.renderVideoFrame());
+      setTimeout(() => this.renderVideoFrame(), 16); // Environ 60 FPS
     }
   }
 
@@ -426,7 +484,53 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
 
     this.ctx.restore();
   }
-
+  private drawControls1() {
+    const canvas = this.canvasElement.nativeElement;
+    const controlHeight = 40;
+    const controlY = canvas.height - controlHeight;
+  
+    if (Date.now() - this.lastMouseMove > 3000 && !this.isHoveringControls) {
+      this.controlsVisible = false;
+    }
+  
+    if (!this.controlsVisible) return;
+  
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.fillStyle = 'rgba(15, 15, 15, 0.8)';
+    this.ctx.fillRect(0, controlY, canvas.width, controlHeight);
+  
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = '18px Arial';
+    this.ctx.fillText(this.isPlaying ? '❚❚' : '▶', 20, controlY + 31);
+  
+    const progressBarX = 50;
+    const progressBarWidth = canvas.width - 100;
+    const progressBarHeight = 4;
+    const progressBarY = controlY + 5 + (controlHeight - progressBarHeight) / 2;
+  
+    const currentMedia = this.mediaItems[this.currentMediaIndex];
+    let progressPercentage = 0;
+  
+    if (currentMedia) {
+      const setDuration = this.getEffectiveDuration(currentMedia);
+      const elapsed = this.isPlaying ? (performance.now() - this.mediaStartTime) / 1000 : this.pausedElapsed;
+      progressPercentage = setDuration > 0 ? (elapsed / setDuration) * 100 : 0;
+      progressPercentage = Math.min(100, Math.max(0, progressPercentage));
+    }
+  
+    this.ctx.fillStyle = '#555';
+    this.ctx.fillRect(progressBarX, progressBarY, progressBarWidth, progressBarHeight);
+    this.ctx.fillStyle = '#f00';
+    this.ctx.fillRect(progressBarX, progressBarY, (progressPercentage / 100) * progressBarWidth, progressBarHeight);
+  
+    // Update fullscreen icon based on state
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = '18px Arial';
+    this.ctx.fillText(this.isFullscreen ? '⛽' : '⛶', canvas.width - 32, controlY + 30);
+  
+    this.ctx.restore();
+  }
   private nextMedia() {
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
@@ -474,22 +578,24 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
         displayDuration: 5
       });
       this.onTextChange();
+      this.mediaItemsChange.emit([...this.mediaItems]);
     }
   }
-
+  
   removeText(index: number) {
     const currentMedia = this.mediaItems[this.currentMediaIndex];
     if (currentMedia && currentMedia.texts[index]) {
       currentMedia.texts.splice(index, 1);
       this.onTextChange();
+      this.mediaItemsChange.emit([...this.mediaItems]);
     }
   }
-
+  
   onTextChange() {
     this.cdr.detectChanges();
     this.playCurrentMedia();
+    this.mediaItemsChange.emit([...this.mediaItems]); // Émettre la liste mise à jour
   }
-
   /** Retourne le libellé de la position en fonction de sa valeur */
   getPositionLabel(position: string): string {
     switch (position) {
@@ -530,8 +636,5 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
       .reduce((sum, m) => sum + this.getEffectiveDuration(m), 0);
   }
 
-  /** Calcule le endGlobal d'un média */
-  private getMediaEndGlobal(media: Media): number {
-    return this.getMediaStartGlobal(media) + this.getEffectiveDuration(media);
-  }
+
 }

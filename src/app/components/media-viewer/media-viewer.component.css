@@ -104,3 +104,29 @@ canvas {
   text-overflow: ellipsis;
   box-sizing: border-box;
 }
+canvas:fullscreen {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+
+.timeline-bar {
+  position: relative;
+  height: 30px;
+  background-color: #e0e0e0;
+  margin-bottom: 10px;
+  width: unset !important; /* Temporaire pour écraser un éventuel style inline parasite */
+}
+
+
+.text-overlay {
+  position: absolute;
+  background-color: rgba(0, 0, 255, 0.3); /* Fond bleu semi-transparent */
+  color: white;
+  padding: 2px 5px;
+  border-radius: 3px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  white-space: nowrap; /* Empêche le texte de passer à la ligne */
+}

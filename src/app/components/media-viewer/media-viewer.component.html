@@ -5,12 +5,13 @@
     <video #videoElement style="display: none;"></video>
 <!-- Conteneur des barres de position -->
 <div *ngFor="let position of ['0', '1', '2', '3', '4']">
-  <h5> {{ position }}</h5>
-  <div class="timeline-bar">
+  <h5>{{ getPositionLabel(position) }}</h5>
+  <div class="timeline-bar" [style.width]="totalDuration * scale + 'px'">
     <div 
       *ngFor="let text of getTextsForPosition(position)" 
       [style.left]="text.startGlobal * scale + 'px'" 
       [style.width]="(text.endGlobal - text.startGlobal) * scale + 'px'"
+      class="text-overlay"
     >
       {{ text.text }}
     </div>
