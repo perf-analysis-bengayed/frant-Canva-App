@@ -1,10 +1,10 @@
 import { Component, Input, AfterViewInit, ViewChild, ElementRef, OnDestroy, OnChanges, SimpleChanges, ChangeDetectorRef, EventEmitter, Output } from '@angular/core';
 
 export interface TextOverlay {
-  overlayText: string;
-  textPosition: string;
-  startTime: number;
-  displayDuration: number;
+  overlayText?: string;
+  textPosition?: string;
+  startTime?: number;
+  displayDuration?: number;
 }
 
 export interface Media {
@@ -302,7 +302,7 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
         this.ctx.drawImage(video, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
         currentMedia.texts.forEach(text => {
           if (this.isTextVisible(text)) {
-            this.drawOverlayText(text.overlayText, text.textPosition);
+            this.drawOverlayText(text.overlayText ?? '', text.textPosition ?? '');
           }
         });
       };
@@ -348,7 +348,8 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
           this.ctx.drawImage(img, 0, 0, this.canvasElement.nativeElement.width, this.canvasElement.nativeElement.height);
           currentMedia.texts.forEach(text => {
             if (this.isTextVisible(text)) {
-              this.drawOverlayText(text.overlayText, text.textPosition);
+              this.drawOverlayText(text.overlayText ?? '', text.textPosition ?? '');
+
             }
           });
         };
@@ -569,18 +570,25 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   }
 
   addText() {
+    
     const currentMedia = this.mediaItems[this.currentMediaIndex];
-    if (currentMedia) {
+  
+    this.pauseSequence();
+    if (!this.validateTextOverlays(currentMedia.texts)) {
+      alert("cette position et time reserve");
+    } else {
       currentMedia.texts.push({
-        overlayText: '',
-        textPosition: '0',
-        startTime: 0,
-        displayDuration: 5
+        overlayText: undefined,
+      textPosition: undefined,
+      startTime: undefined,
+      displayDuration: undefined
       });
       this.onTextChange();
       this.mediaItemsChange.emit([...this.mediaItems]);
     }
+
   }
+  
   
   removeText(index: number) {
     const currentMedia = this.mediaItems[this.currentMediaIndex];
@@ -591,12 +599,40 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
     }
   }
   
-  onTextChange() {
-    this.cdr.detectChanges();
-    this.playCurrentMedia();
-    this.mediaItemsChange.emit([...this.mediaItems]); // Émettre la liste mise à jour
+
+  
+  private validateTextOverlays(texts: TextOverlay[]): boolean {
+    for (let i = 0; i < texts.length; i++) {
+      for (let j = i + 1; j < texts.length; j++) {
+        if (texts[i].textPosition! === texts[j].textPosition!) {
+          const start1 = texts[i].startTime!;
+          const end1 = texts[i].startTime! + texts[i].displayDuration!;
+          const start2 = texts[j].startTime!;
+          const end2 = texts[j].startTime! + texts[j].displayDuration!;
+          if (start1 < end2 && start2 < end1) {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
   }
-  /** Retourne le libellé de la position en fonction de sa valeur */
+  
+
+onTextChange() {
+  // Vérifier uniquement le média courant
+  const currentMedia = this.mediaItems[this.currentMediaIndex];
+  if (!this.validateTextOverlays(currentMedia.texts)) {
+    alert("cette position et time reserve");
+  } else
+   {
+
+  this.cdr.detectChanges();
+  this.playCurrentMedia();
+  this.mediaItemsChange.emit([...this.mediaItems]); // Émettre la liste mise à jour
+}}
+ 
+
   getPositionLabel(position: string): string {
     switch (position) {
       case '0': return 'Gauche Haut';
@@ -609,24 +645,81 @@ export class MediaViewerComponent implements AfterViewInit, OnDestroy, OnChanges
   }
 
   /** Retourne les textes associés à une position donnée avec leurs startGlobal et endGlobal */
-  getTextsForPosition(position: string): any[] {
-    const texts = [];
-    for (const media of this.mediaItems) {
-      const mediaStartGlobal = this.getMediaStartGlobal(media);
-      for (const text of media.texts) {
-        if (text.textPosition === position && text.overlayText) {
-          const textStartGlobal = mediaStartGlobal + (text.startTime || 0);
-          const textEndGlobal = textStartGlobal + (text.displayDuration || 0);
-          texts.push({
-            text: text.overlayText,
-            startGlobal: textStartGlobal,
-            endGlobal: textEndGlobal
-          });
-        }
+/** Retourne les textes associés à une position donnée avec leurs startGlobal et endGlobal.
+ *  Si plusieurs textes sont présents pour la même position et le même temps, 
+ *  on retourne une entrée unique avec le message d'erreur.
+ */
+getTextsForPosition(position: string): any[] {
+  const texts = [];
+  // Parcourir tous les médias
+  for (const media of this.mediaItems) {
+    const mediaStartGlobal = this.getMediaStartGlobal(media);
+    for (const text of media.texts) {
+      // On considère uniquement les textes pour la position demandée et dont overlayText est défini
+      if (text.textPosition === position && text.overlayText) {
+        const textStartGlobal = mediaStartGlobal + (text.startTime || 0);
+        const textEndGlobal = textStartGlobal + (text.displayDuration || 0);
+        texts.push({
+          text: text.overlayText,
+          startGlobal: textStartGlobal,
+          endGlobal: textEndGlobal,
+          textPosition: text.textPosition,
+          startTime: text.startTime
+        });
       }
     }
-    return texts;
   }
+
+  // Trier les textes par leur temps de début
+  texts.sort((a, b) => a.startGlobal - b.startGlobal);
+
+  const finalTexts: any[] = [];
+  let group: any[] = [];
+
+  // Regrouper les textes dont les périodes se chevauchent
+  for (const t of texts) {
+    if (group.length === 0) {
+      group.push(t);
+    } else {
+      // Calculer la fin maximale du groupe courant
+      const groupEnd = Math.max(...group.map(item => item.endGlobal));
+      // Si le texte courant commence avant la fin du groupe, il se chevauche
+      if (t.startGlobal < groupEnd) {
+        group.push(t);
+      } else {
+        // Le texte ne chevauche pas le groupe courant, on traite le groupe
+        if (group.length > 1) {
+          finalTexts.push({
+            text: "cette position et time reserve",
+            startGlobal: group[0].startGlobal,
+            endGlobal: groupEnd
+          });
+        } else {
+          finalTexts.push(group[0]);
+        }
+        // On démarre un nouveau groupe
+        group = [t];
+      }
+    }
+  }
+  // Traiter le dernier groupe
+  if (group.length > 0) {
+    const groupEnd = Math.max(...group.map(item => item.endGlobal));
+    if (group.length > 1) {
+      finalTexts.push({
+        text: "cette position et time reserve",
+        startGlobal: group[0].startGlobal,
+        endGlobal: groupEnd
+      });
+    } else {
+      finalTexts.push(group[0]);
+    }
+  }
+
+  return finalTexts;
+}
+
+
 
   /** Calcule le startGlobal d'un média en fonction de sa position dans la séquence */
   private getMediaStartGlobal(media: Media): number {
